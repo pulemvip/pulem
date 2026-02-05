@@ -5,13 +5,17 @@ import { supabase } from '@/lib/supabase'
 
 // 🔢 Semana actual (se renueva los lunes)
 const getSemanaActual = () => {
-  const hoy = new Date()
-  const primerDiaAnio = new Date(hoy.getFullYear(), 0, 1)
-  const dias = Math.floor(
-    (hoy - primerDiaAnio) / (24 * 60 * 60 * 1000)
-  )
-  const semana = Math.ceil((dias + primerDiaAnio.getDay() + 1) / 7)
-  return Number(`${hoy.getFullYear()}${semana}`)
+  const hoy = new Date();
+const primerDiaAnio = new Date(hoy.getFullYear(), 0, 1);
+
+const dias = Math.floor(
+  (hoy.getTime() - primerDiaAnio.getTime()) / (24 * 60 * 60 * 1000)
+);
+
+const semana = Math.ceil((dias + primerDiaAnio.getDay() + 1) / 7);
+
+return Number(`${hoy.getFullYear()}${semana}`);
+
 }
 
 export default function ClientesPage() {

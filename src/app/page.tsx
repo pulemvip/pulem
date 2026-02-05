@@ -1,20 +1,31 @@
 'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function Home() {
-  const test = async () => {
-    const { data, error } = await supabase.auth.getUser();
-    console.log(data, error);
-  };
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace('/login'); // 🔹 redirige al login
+      } else {
+        router.replace('/dashboard/clientes'); // 🔹 opcional: si ya está logueado
+      }
+    };
+
+    checkUser();
+  }, [router]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <button
-        onClick={test}
-        className="bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        Test Supabase
-      </button>
-    </main>
+    <div className="flex min-h-screen items-center justify-center text-gray-500">
+      Verificando sesión...
+    </div>
   );
 }

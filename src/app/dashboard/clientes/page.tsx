@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 
 type Cliente = {
@@ -9,7 +9,9 @@ type Cliente = {
   telefono: string
   estado: string | null
   ultima_semana_enviada: number | null
+  user_id: string
 }
+
 
 type Invitado = {
   id: number
@@ -35,11 +37,9 @@ export default function DashboardPage() {
   const [nuevoInvitado, setNuevoInvitado] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const [tabActual, setTabActual] = useState<'clientes' | 'invitados'>('clientes')
-  const [filtroEstado, setFiltroEstado] =
-    useState<'todos' | 'disponible' | 'bloqueado'>('todos')
-
+  const [tabActual, setTabActual] = useState<'clientes' | 'invitados' | 'ranking'>('clientes')
   const [userIdActual, setUserIdActual] = useState('')
+
   const semanaActual = getSemanaActual()
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function DashboardPage() {
 
       setMensaje(
         settings?.mensaje ??
-          `Hola {{nombre}} 👋
+        `Hola {{nombre}} 👋
 Te escribo de PULEM VIP.
 ¿Te paso info de la próxima fecha? 🔥`
       )
@@ -150,25 +150,78 @@ Te escribo de PULEM VIP.
     setInvitados(prev => prev.filter(i => i.id !== id))
   }
 
-  if (loading) {
-    return <div className="text-zinc-400">Cargando dashboard...</div>
+  /* 🔢 RESUMEN */
+const resumen = useMemo(() => {
+  const disponibles = clientes.filter(
+    c => c.ultima_semana_enviada !== semanaActual
+  ).length
+
+  const bloqueados = clientes.length - disponibles
+
+  return {
+    total: clientes.length,
+    disponibles,
+    bloqueados,
   }
+}, [clientes, semanaActual])
+
+/* 🧑‍🤝‍🧑 RANKING INVITACIONES */
+const rankingInvitaciones = useMemo(() => {
+  const conteo: Record<string, { email: string; total: number }> = {}
+
+  invitados.forEach(i => {
+    if (!conteo[i.user_id]) {
+      conteo[i.user_id] = {
+        email: i.user_email,
+        total: 0,
+      }
+    }
+    conteo[i.user_id].total++
+  })
+
+  return Object.values(conteo).sort((a, b) => b.total - a.total)
+}, [invitados])
+
+
+/* 📲 RANKING MENSAJES ENVIADOS (SEMANA ACTUAL) */
+const rankingMensajes = useMemo(() => {
+  const conteo: Record<string, number> = {}
+
+  clientes.forEach(c => {
+    if (c.ultima_semana_enviada === semanaActual) {
+      conteo[c.user_id] = (conteo[c.user_id] || 0) + 1
+    }
+  })
+
+  return Object.entries(conteo)
+    .map(([user_id, total]) => ({ user_id, total }))
+    .sort((a, b) => b.total - a.total)
+}, [clientes, semanaActual])
+
+
+const getEmailByUserId = (userId: string) => {
+  return invitados.find(i => i.user_id === userId)?.user_email ?? userId
+}
+
 
   return (
     <div className="space-y-6">
       {/* TABS */}
       <div className="flex gap-2">
-        {['clientes', 'invitados'].map(tab => (
+        {['clientes', 'invitados', 'ranking'].map(tab => (
           <button
             key={tab}
             onClick={() => setTabActual(tab as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              tabActual === tab
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${tabActual === tab
                 ? 'bg-zinc-100 text-zinc-900'
                 : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-            }`}
+              }`}
           >
-            {tab === 'clientes' ? 'Clientes' : 'Invitados'}
+            {tab === 'clientes'
+              ? 'Clientes'
+              : tab === 'invitados'
+                ? 'Invitados'
+                : 'Ranking'}
           </button>
         ))}
       </div>
@@ -176,6 +229,28 @@ Te escribo de PULEM VIP.
       {/* CLIENTES */}
       {tabActual === 'clientes' && (
         <>
+          {/* 🔢 RESUMEN */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
+              <div className="text-xs text-zinc-400">Disponibles</div>
+              <div className="text-xl font-bold text-amber-300">
+                {resumen.disponibles}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
+              <div className="text-xs text-zinc-400">Bloqueados</div>
+              <div className="text-xl font-bold text-zinc-400">
+                {resumen.bloqueados}
+              </div>
+            </div>
+
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
+              <div className="text-xs text-zinc-400">Total</div>
+              <div className="text-xl font-bold">{resumen.total}</div>
+            </div>
+          </div>
+
           {/* MENSAJE */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3">
             <h2 className="font-semibold">Mensaje de WhatsApp</h2>
@@ -202,8 +277,8 @@ Te escribo de PULEM VIP.
             </div>
           </div>
 
-          {/* MOBILE CARDS */}
-          <div className=" space-y-3">
+          {/* CARDS CLIENTES */}
+          <div className="space-y-3">
             {clientes.map(c => {
               const bloqueado = c.ultima_semana_enviada === semanaActual
               return (
@@ -216,11 +291,10 @@ Te escribo de PULEM VIP.
 
                   <div className="flex justify-between items-center">
                     <span
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        bloqueado
+                      className={`text-xs px-2 py-1 rounded-full ${bloqueado
                           ? 'bg-zinc-800 text-zinc-400'
                           : 'bg-amber-900/40 text-amber-300'
-                      }`}
+                        }`}
                     >
                       {bloqueado ? 'Bloqueado' : 'Disponible'}
                     </span>
@@ -228,11 +302,10 @@ Te escribo de PULEM VIP.
                     <button
                       disabled={bloqueado}
                       onClick={() => enviarWhatsapp(c)}
-                      className={`px-3 py-1 rounded-lg text-sm ${
-                        bloqueado
+                      className={`px-3 py-1 rounded-lg text-sm ${bloqueado
                           ? 'bg-zinc-800 text-zinc-500'
                           : 'bg-green-600 text-white'
-                      }`}
+                        }`}
                     >
                       WhatsApp
                     </button>
@@ -289,6 +362,90 @@ Te escribo de PULEM VIP.
           </div>
         </div>
       )}
+
+      {/* RANKING */}
+{tabActual === 'ranking' && (
+  <div className="space-y-6">
+
+    {/* 🧑‍🤝‍🧑 RANKING INVITACIONES */}
+    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+      <h2 className="font-semibold text-lg">🧑‍🤝‍🧑 Ranking de Invitaciones</h2>
+
+      {rankingInvitaciones.length === 0 && (
+        <div className="text-sm text-zinc-400">
+          Todavía no hay invitados cargados
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {rankingInvitaciones.map((r, index) => (
+          <div
+            key={r.email}
+            className="flex justify-between items-center border border-zinc-800 rounded-lg p-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="font-bold text-amber-400">
+                #{index + 1}
+              </div>
+              <div>
+                <div className="font-medium">{r.email}</div>
+                <div className="text-xs text-zinc-400">
+                  Invitaciones
+                </div>
+              </div>
+            </div>
+
+            <div className="text-lg font-bold text-green-500">
+              {r.total}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* 📲 RANKING MENSAJES */}
+    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+      <h2 className="font-semibold text-lg">
+  📲 Ranking de Mensajes – Semana {semanaActual}
+</h2>
+
+      {rankingMensajes.length === 0 && (
+        <div className="text-sm text-zinc-400">
+          Todavía no se enviaron mensajes
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {rankingMensajes.map((r, index) => (
+          <div
+            key={r.user_id}
+            className="flex justify-between items-center border border-zinc-800 rounded-lg p-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="font-bold text-amber-400">
+                #{index + 1}
+              </div>
+              <div>
+                <div className="font-medium">
+                  {getEmailByUserId(r.user_id)}
+                </div>
+                <div className="text-xs text-zinc-400">
+                  Mensajes enviados
+                </div>
+              </div>
+            </div>
+
+            <div className="text-lg font-bold text-green-500">
+              {r.total}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  </div>
+)}
+
     </div>
   )
 }

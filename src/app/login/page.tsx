@@ -45,8 +45,7 @@ export default function LoginPage() {
           />
         </div>
 
-        <h1 className="text-3xl font-bold text-center text-white">Bienvenido</h1>
-        <p className="text-sm text-gray-300 text-center">Inicia sesión para continuar</p>
+        <h1 className="text-3xl font-bold text-center text-white">PULEM</h1>
 
         {/* Form */}
         <div className="w-full flex flex-col gap-4">
@@ -73,14 +72,6 @@ export default function LoginPage() {
             className="w-full bg-blue-600 text-white p-3 rounded-xl font-semibold hover:bg-blue-700 transition transform hover:scale-105"
           >
             Entrar
-          </button>
-
-          <button
-            onClick={register}
-            disabled={loading}
-            className="w-full bg-gray-700 text-white p-3 rounded-xl font-semibold hover:bg-gray-600 transition transform hover:scale-105"
-          >
-            Registrarse
           </button>
         </div>
       </div>

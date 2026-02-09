@@ -20,6 +20,13 @@ type Invitado = {
   user_email: string
 }
 
+type RankingMensaje = {
+  user_id: string
+  total: number
+  ultima_semana_enviada: number
+}
+
+
 const getSemanaActual = (): number => {
   const hoy = new Date()
   const primerDiaAnio = new Date(hoy.getFullYear(), 0, 1)
@@ -36,49 +43,71 @@ export default function DashboardPage() {
   const [mensaje, setMensaje] = useState('')
   const [nuevoInvitado, setNuevoInvitado] = useState('')
   const [loading, setLoading] = useState(true)
+  const [rankingMensajes, setRankingMensajes] = useState<RankingMensaje[]>([])
 
   const [tabActual, setTabActual] = useState<'clientes' | 'invitados' | 'ranking'>('clientes')
   const [userIdActual, setUserIdActual] = useState('')
 
   const semanaActual = getSemanaActual()
+  const [clientesRanking, setClientesRanking] = useState<Cliente[]>([])
 
   useEffect(() => {
-    const cargarTodo = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login'
-        return
-      }
-
-      setUserIdActual(user.id)
-
-      const { data: clientesData } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('nombre')
-
-      setClientes((clientesData as Cliente[]) || [])
-
-      const { data: settings } = await supabase
-        .from('user_settings')
-        .select('mensaje')
-        .eq('user_id', user.id)
-        .single()
-
-      setMensaje(
-        settings?.mensaje ??
-        `Hola {{nombre}} 👋
-Te escribo de PULEM VIP.
-¿Te paso info de la próxima fecha? 🔥`
-      )
-
-      await cargarInvitados()
-      setLoading(false)
+  const cargarTodo = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      window.location.href = '/login'
+      return
     }
 
-    cargarTodo()
-  }, [])
+    setUserIdActual(user.id)
+
+    const { data: clientesData } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('nombre')
+
+    setClientes((clientesData as Cliente[]) || [])
+
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('mensaje')
+      .eq('user_id', user.id)
+      .single()
+
+    setMensaje(
+      settings?.mensaje ??
+      `Hola {{nombre}} 👋
+Te escribo de PULEM VIP.
+¿Te paso info de la próxima fecha? 🔥`
+    )
+
+    const { data: invitadosData } = await supabase
+      .from('invitados')
+      .select('*')
+      .order('nombre')
+
+    setInvitados((invitadosData as Invitado[]) || [])
+
+    /* 🔥 RANKING MENSAJES (VIEW SQL) */
+    const { data: rankingData, error } = await supabase
+      .from('ranking_mensajes_semana')
+      .select('user_id, total, ultima_semana_enviada')
+      .eq('ultima_semana_enviada', semanaActual)
+      .order('total', { ascending: false })
+
+    if (!error) {
+      setRankingMensajes(rankingData as RankingMensaje[])
+    } else {
+      console.error('Error ranking mensajes:', error)
+    }
+
+    setLoading(false)
+  }
+
+  cargarTodo()
+}, [semanaActual])
+
 
   const cargarInvitados = async () => {
     const { data } = await supabase
@@ -182,21 +211,6 @@ const rankingInvitaciones = useMemo(() => {
   return Object.values(conteo).sort((a, b) => b.total - a.total)
 }, [invitados])
 
-
-/* 📲 RANKING MENSAJES ENVIADOS (SEMANA ACTUAL) */
-const rankingMensajes = useMemo(() => {
-  const conteo: Record<string, number> = {}
-
-  clientes.forEach(c => {
-    if (c.ultima_semana_enviada === semanaActual) {
-      conteo[c.user_id] = (conteo[c.user_id] || 0) + 1
-    }
-  })
-
-  return Object.entries(conteo)
-    .map(([user_id, total]) => ({ user_id, total }))
-    .sort((a, b) => b.total - a.total)
-}, [clientes, semanaActual])
 
 
 const getEmailByUserId = (userId: string) => {
@@ -403,45 +417,37 @@ const getEmailByUserId = (userId: string) => {
       </div>
     </div>
 
-    {/* 📲 RANKING MENSAJES */}
-    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
-      <h2 className="font-semibold text-lg">
-  📲 Ranking de Mensajes – Semana {semanaActual}
-</h2>
+    {/* RANKING MENSAJES */}
+<div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+  <h2 className="font-semibold text-lg">
+    📲 Ranking de Mensajes – Semana {semanaActual}
+  </h2>
 
-      {rankingMensajes.length === 0 && (
-        <div className="text-sm text-zinc-400">
-          Todavía no se enviaron mensajes
+  {rankingMensajes.length === 0 && (
+    <div className="text-sm text-zinc-400">
+      Todavía no se enviaron mensajes
+    </div>
+  )}
+
+  {rankingMensajes.map((r, index) => (
+    <div
+      key={r.user_id}
+      className="flex justify-between items-center border border-zinc-800 rounded-lg p-3"
+    >
+      <div className="flex items-center gap-3">
+        <div className="font-bold text-amber-400">#{index + 1}</div>
+        <div className="font-medium">
+          {getEmailByUserId(r.user_id)}
         </div>
-      )}
+      </div>
 
-      <div className="space-y-2">
-        {rankingMensajes.map((r, index) => (
-          <div
-            key={r.user_id}
-            className="flex justify-between items-center border border-zinc-800 rounded-lg p-3"
-          >
-            <div className="flex items-center gap-3">
-              <div className="font-bold text-amber-400">
-                #{index + 1}
-              </div>
-              <div>
-                <div className="font-medium">
-                  {getEmailByUserId(r.user_id)}
-                </div>
-                <div className="text-xs text-zinc-400">
-                  Mensajes enviados
-                </div>
-              </div>
-            </div>
-
-            <div className="text-lg font-bold text-green-500">
-              {r.total}
-            </div>
-          </div>
-        ))}
+      <div className="font-bold text-green-500">
+        {r.total}
       </div>
     </div>
+  ))}
+</div>
+
 
   </div>
 )}

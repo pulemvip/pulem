@@ -9,7 +9,10 @@ type HomeContent = {
   descripcion: string
   flyer_url: string
   video_url: string
+  boton_texto: string | null
+  boton_link: string | null
 }
+
 
 export default function Home() {
   const [content, setContent] = useState<HomeContent | null>(null)
@@ -17,9 +20,10 @@ export default function Home() {
   useEffect(() => {
     const fetchHome = async () => {
       const { data, error } = await supabase
-        .from('home_content')
-        .select('titulo, descripcion, flyer_url, video_url')
-        .single()
+  .from('home_content')
+  .select('titulo, descripcion, flyer_url, video_url, boton_texto, boton_link')
+  .single()
+
 
       if (!error) setContent(data)
     }
@@ -72,6 +76,19 @@ export default function Home() {
         <p className="mt-3 max-w-xl text-lg opacity-90">
           {content.descripcion}
         </p>
+        {content.boton_texto && content.boton_link && (
+  <a
+    href={content.boton_link}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="mt-6 inline-block rounded-xl bg-amber-500 px-8 py-4
+               text-lg font-bold text-black shadow-xl
+               hover:bg-amber-400 transition"
+  >
+    {content.boton_texto}
+  </a>
+)}
+
       </div>
     </div>
   )

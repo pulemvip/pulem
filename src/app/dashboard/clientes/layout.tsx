@@ -11,6 +11,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {
@@ -29,26 +30,21 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100">
       {/* TOPBAR */}
-      <header className="sticky top-0 z-50 bg-zinc-950 border-b border-zinc-800">
-        <div className="relative max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-zinc-950 border-b border-zinc-800 shadow-sm transition-shadow duration-300 hover:shadow-md">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
-          {/* IZQUIERDA */}
-          <h1 className="font-semibold text-sm sm:text-base tracking-tight">
-            Pulem
-          </h1>
-
-          {/* CENTRO – LOGO */}
+          {/* LOGO IZQUIERDA */}
           <Link
-            href="/"
-            className="absolute left-1/2 -translate-x-1/2 flex items-center"
+            href="/dashboard/clientes"
+            className="flex items-center gap-2 transform transition-transform duration-300 hover:scale-105"
           >
             <Image
               src="/logo.png"
               alt="VIP"
-              width={56}
-              height={56}
+              width={60}
+              height={60}
               priority
-              className="sm:w-[64px] sm:h-[64px]"
+              className="sm:w-[80px] sm:h-[80px]"
             />
           </Link>
 
@@ -57,17 +53,28 @@ export default function DashboardLayout({
             {userEmail && (
               <span
                 title={userEmail}
-                className="hidden sm:block max-w-[200px] truncate text-xs text-zinc-400"
+                className="
+                  max-w-[120px] truncate
+                  text-[11px] text-zinc-400
+                  sm:max-w-[200px]
+                  sm:text-xs
+                  transition-colors duration-300
+                  hover:text-white
+                "
               >
                 {userEmail}
               </span>
             )}
 
             <button
-              onClick={cerrarSesion}
-              className="text-sm px-3 py-1.5 rounded-lg
+              onClick={() => setShowLogoutModal(true)}
+              className="
+                text-sm px-3 py-1.5 rounded-lg
                 border border-zinc-700
-                hover:bg-zinc-800 transition"
+                bg-zinc-900
+                transition-transform transition-colors duration-300
+                hover:bg-zinc-800 hover:scale-105
+              "
             >
               Cerrar sesión
             </button>
@@ -80,6 +87,38 @@ export default function DashboardLayout({
       <main className="max-w-7xl mx-auto px-4 py-6">
         {children}
       </main>
+
+      {/* MODAL DE CONFIRMACIÓN CON ANIMACIÓN */}
+      <div
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 transition-opacity duration-300
+          ${showLogoutModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+        `}
+      >
+        <div
+          className={`bg-zinc-900 rounded-xl p-6 w-80 flex flex-col items-center space-y-4
+            transform transition-transform duration-300
+            ${showLogoutModal ? 'scale-100' : 'scale-90'}
+          `}
+        >
+          <p className="text-white text-center">
+            ¿Estás seguro que querés cerrar sesión?
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setShowLogoutModal(false)}
+              className="px-4 py-2 rounded-lg border border-zinc-700 hover:bg-zinc-800 transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={cerrarSesion}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

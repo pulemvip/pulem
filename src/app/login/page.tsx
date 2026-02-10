@@ -12,7 +12,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const login = async () => {
+  const login = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault(); // evita recarga de página
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -22,33 +23,19 @@ export default function LoginPage() {
     else router.push('/dashboard/clientes');
   };
 
-  const register = async () => {
-    setLoading(true);
-    setError('');
-    const { error } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
-
-    if (error) setError(error.message);
-    else alert('Usuario creado. Revisá tu email.');
-  };
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-black via-gray-900 to-blue-900">
-      <div className="w-96 p-8 bg-gray-900/80 backdrop-blur-md rounded-3xl shadow-2xl space-y-6 flex flex-col items-center transform transition duration-500 hover:scale-105">
+    <main className="flex items-center justify-center h-[100dvh] overflow-hidden bg-gradient-to-br from-black via-gray-900 to-blue-900">
+      <div className="w-96 max-w-[90vw] p-8 bg-gray-900/80 backdrop-blur-md rounded-3xl shadow-2xl space-y-6 flex flex-col items-center transition duration-500 sm:hover:scale-105">
+
         {/* Logo */}
         <div className="w-32 h-32 relative">
-          <Image
-            src="/logo.png" // 🔹 Cambiá por tu logo
-            alt="Logo"
-            fill
-            className="object-contain"
-          />
+          <Image src="/logo.png" alt="Logo" fill className="object-contain" priority />
         </div>
 
-        <h1 className="text-3xl font-bold text-center text-white">PULEM</h1>
+        <h1 className="text-3xl font-bold text-center text-white"></h1>
 
         {/* Form */}
-        <div className="w-full flex flex-col gap-4">
+        <form className="w-full flex flex-col gap-4" onSubmit={login}>
           <input
             className="w-full border border-gray-700 rounded-xl p-3 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
             placeholder="Email"
@@ -59,7 +46,7 @@ export default function LoginPage() {
           <input
             type="password"
             className="w-full border border-gray-700 rounded-xl p-3 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-            placeholder="Password"
+            placeholder="Contraseña"
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
@@ -67,13 +54,13 @@ export default function LoginPage() {
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <button
-            onClick={login}
+            type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white p-3 rounded-xl font-semibold hover:bg-blue-700 transition transform hover:scale-105"
+            className="w-full bg-blue-600 text-white p-3 rounded-xl font-semibold hover:bg-blue-700 transition sm:hover:scale-105"
           >
             Entrar
           </button>
-        </div>
+        </form>
       </div>
     </main>
   );

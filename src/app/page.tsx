@@ -49,15 +49,19 @@ export default function Home() {
       <div className="absolute inset-0 bg-black/60" />
 
       {/* ACCESO DUEÑOS */}
-<div
-  className="
-    relative z-20 mb-4 flex w-full justify-end
-    sm:absolute sm:right-6 sm:top-6 sm:mb-0 sm:w-auto
+      <div
+        className="
+    relative z-20
+    mb-4 mt-4 px-4
+    flex w-full justify-end
+
+    sm:absolute sm:right-6 sm:top-6
+    sm:mb-0 sm:mt-0 sm:px-0 sm:w-auto
   "
->
-  <Link
-    href="/login"
-    className="
+      >
+        <Link
+          href="/login"
+          className="
       inline-flex items-center justify-center
       rounded-xl
       bg-gradient-to-r from-sky-500 to-cyan-400
@@ -68,10 +72,11 @@ export default function Home() {
       active:scale-95
       sm:px-5 sm:py-2 sm:text-base
     "
-  >
-    Acceso dueños
-  </Link>
-</div>
+        >
+          Acceso dueños
+        </Link>
+      </div>
+
 
 
 
@@ -83,6 +88,9 @@ export default function Home() {
           sm:justify-center
         "
       >
+        <h1 className="text-2xl font-bold sm:text-3xl md:text-4xl">
+          {content?.titulo}
+        </h1>
         {content?.flyer_url && (
           <img
             src={content.flyer_url}
@@ -94,10 +102,6 @@ export default function Home() {
             "
           />
         )}
-
-        <h1 className="text-2xl font-bold sm:text-3xl md:text-4xl">
-          {content?.titulo}
-        </h1>
 
         <p className="mt-3 max-w-md text-sm opacity-90 sm:text-base md:text-lg">
           {content?.descripcion}

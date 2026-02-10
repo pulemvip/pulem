@@ -242,6 +242,8 @@ const getEmailByUserId = (userId: string) => {
   return invitados.find(i => i.user_id === userId)?.user_email ?? userId
 }
 
+const HOME_ID = '4c5c253b-2724-4e2a-b69e-7fc0ac0b3ea2'
+
 const guardarHome = async () => {
   if (!home) return
 
@@ -254,19 +256,21 @@ const guardarHome = async () => {
       descripcion: home.descripcion,
       flyer_url: home.flyer_url,
       video_url: home.video_url,
-      boton_texto: home.boton_texto,
-      boton_link: home.boton_link,
+      boton_texto: home.boton_texto || null,
+      boton_link: home.boton_link || null,
     })
+    .eq('id', HOME_ID) // ✅ UUID real
 
   setSavingHome(false)
 
   if (error) {
     console.error('Error guardando home:', error)
-    alert('Error al guardar la Home')
+    alert(error.message)
   } else {
     alert('Home actualizada correctamente')
   }
 }
+
 
 
 const subirArchivoHome = async (

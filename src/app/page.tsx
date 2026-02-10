@@ -48,16 +48,26 @@ export default function Home() {
       {/* OVERLAY */}
       <div className="absolute inset-0 bg-black/60" />
 
-      {/* LOGIN */}
-      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
-        <Link
-          href="/login"
-          className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-black
-                     hover:bg-gray-200 sm:px-5 sm:py-2 sm:text-base"
-        >
-          Acceso dueños
-        </Link>
-      </div>
+      {/* ACCESO DUEÑOS */}
+<div className="relative z-20 mb-4 w-full text-center sm:absolute sm:right-6 sm:top-6 sm:mb-0 sm:w-auto">
+  <Link
+    href="/login"
+    className="
+      inline-flex items-center justify-center
+      rounded-xl
+      bg-gradient-to-r from-sky-500 to-cyan-400
+      px-4 py-2 text-sm font-bold text-white
+      shadow-lg shadow-sky-500/30
+      transition-all duration-300
+      hover:scale-105 hover:shadow-sky-500/50
+      active:scale-95
+      sm:px-5 sm:py-2 sm:text-base
+    "
+  >
+    Acceso dueños
+  </Link>
+</div>
+
 
       {/* CONTENIDO */}
       <div

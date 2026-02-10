@@ -32,9 +32,11 @@ type Invitado = {
 
 type RankingMensaje = {
   user_id: string
+  user_email: string
   total: number
   ultima_semana_enviada: number
 }
+
 
 
 const getSemanaActual = (): number => {

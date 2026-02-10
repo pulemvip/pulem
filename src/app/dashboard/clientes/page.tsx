@@ -123,6 +123,7 @@ Te escribo de PULEM VIP.
       .select('*')
       .single()
 
+
     setHome(homeData)
 
     setLoading(false)
@@ -256,7 +257,6 @@ const guardarHome = async () => {
       boton_texto: home.boton_texto,
       boton_link: home.boton_link,
     })
-    .eq('id', home.id)
 
   setSavingHome(false)
 
@@ -267,6 +267,7 @@ const guardarHome = async () => {
     alert('Home actualizada correctamente')
   }
 }
+
 
 const subirArchivoHome = async (
   file: File,

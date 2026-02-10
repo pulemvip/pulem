@@ -49,7 +49,12 @@ export default function Home() {
       <div className="absolute inset-0 bg-black/60" />
 
       {/* ACCESO DUEÑOS */}
-<div className="relative z-20 mb-4 w-full text-center sm:absolute sm:right-6 sm:top-6 sm:mb-0 sm:w-auto">
+<div
+  className="
+    relative z-20 mb-4 flex w-full justify-end
+    sm:absolute sm:right-6 sm:top-6 sm:mb-0 sm:w-auto
+  "
+>
   <Link
     href="/login"
     className="
@@ -67,6 +72,7 @@ export default function Home() {
     Acceso dueños
   </Link>
 </div>
+
 
 
       {/* CONTENIDO */}

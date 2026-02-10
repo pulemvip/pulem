@@ -12,6 +12,16 @@ type Cliente = {
   user_id: string
 }
 
+type HomeContent = {
+  id: string
+  titulo: string
+  descripcion: string
+  flyer_url: string
+  video_url: string
+  boton_texto: string | null
+  boton_link: string | null
+}
+
 
 type Invitado = {
   id: number
@@ -45,11 +55,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [rankingMensajes, setRankingMensajes] = useState<RankingMensaje[]>([])
 
-  const [tabActual, setTabActual] = useState<'clientes' | 'invitados' | 'ranking'>('clientes')
+  const [tabActual, setTabActual] =
+  useState<'clientes' | 'invitados' | 'ranking' | 'home'>('clientes')
   const [userIdActual, setUserIdActual] = useState('')
 
   const semanaActual = getSemanaActual()
   const [clientesRanking, setClientesRanking] = useState<Cliente[]>([])
+
+  const [home, setHome] = useState<HomeContent | null>(null)
+const [savingHome, setSavingHome] = useState(false)
+
 
   useEffect(() => {
   const cargarTodo = async () => {
@@ -102,11 +117,20 @@ Te escribo de PULEM VIP.
       console.error('Error ranking mensajes:', error)
     }
 
+    /* 🏠 HOME CONTENT */
+    const { data: homeData } = await supabase
+      .from('home_content')
+      .select('*')
+      .single()
+
+    setHome(homeData)
+
     setLoading(false)
   }
 
   cargarTodo()
 }, [semanaActual])
+
 
 
   const cargarInvitados = async () => {
@@ -217,12 +241,72 @@ const getEmailByUserId = (userId: string) => {
   return invitados.find(i => i.user_id === userId)?.user_email ?? userId
 }
 
+const guardarHome = async () => {
+  if (!home) return
+
+  setSavingHome(true)
+
+  const { error } = await supabase
+    .from('home_content')
+    .update({
+      titulo: home.titulo,
+      descripcion: home.descripcion,
+      flyer_url: home.flyer_url,
+      video_url: home.video_url,
+      boton_texto: home.boton_texto,
+      boton_link: home.boton_link,
+    })
+    .eq('id', home.id)
+
+  setSavingHome(false)
+
+  if (error) {
+    console.error('Error guardando home:', error)
+    alert('Error al guardar la Home')
+  } else {
+    alert('Home actualizada correctamente')
+  }
+}
+
+const subirArchivoHome = async (
+  file: File,
+  tipo: 'flyer' | 'video'
+) => {
+  if (!home) return
+
+  const ext = file.name.split('.').pop()
+  const path = `${tipo}.${ext}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('home-assets')
+    .upload(path, file, { upsert: true })
+
+  if (uploadError) {
+    console.error('Error subiendo archivo:', uploadError)
+    alert('Error al subir el archivo')
+    return
+  }
+
+  const { data } = supabase.storage
+    .from('home-assets')
+    .getPublicUrl(path)
+
+  setHome(prev =>
+    prev
+      ? {
+          ...prev,
+          [tipo === 'flyer' ? 'flyer_url' : 'video_url']: data.publicUrl,
+        }
+      : prev
+  )
+}
+
 
   return (
     <div className="space-y-6">
       {/* TABS */}
       <div className="flex gap-2">
-        {['clientes', 'invitados', 'ranking'].map(tab => (
+        {['clientes', 'invitados', 'ranking', 'home'].map(tab => (
           <button
             key={tab}
             onClick={() => setTabActual(tab as any)}
@@ -232,10 +316,14 @@ const getEmailByUserId = (userId: string) => {
               }`}
           >
             {tab === 'clientes'
-              ? 'Clientes'
-              : tab === 'invitados'
-                ? 'Invitados'
-                : 'Ranking'}
+    ? 'Clientes'
+    : tab === 'invitados'
+      ? 'Invitados'
+      : tab === 'ranking'
+        ? 'Ranking'
+        : tab === 'home'
+          ? 'Home'
+          : tab}
           </button>
         ))}
       </div>
@@ -451,6 +539,91 @@ const getEmailByUserId = (userId: string) => {
 
   </div>
 )}
+
+{tabActual === 'home' && home && (
+  <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4">
+
+    <h2 className="font-semibold text-lg">🏠 Home pública</h2>
+
+    {/* TÍTULO */}
+    <input
+      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+      value={home.titulo}
+      onChange={e => setHome({ ...home, titulo: e.target.value })}
+      placeholder="Título"
+    />
+
+    {/* DESCRIPCIÓN */}
+    <textarea
+      rows={3}
+      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+      value={home.descripcion}
+      onChange={e => setHome({ ...home, descripcion: e.target.value })}
+      placeholder="Descripción"
+    />
+
+    {/* TEXTO BOTÓN */}
+    <input
+      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+      value={home.boton_texto ?? ''}
+      onChange={e =>
+        setHome({ ...home, boton_texto: e.target.value })
+      }
+      placeholder="Texto del botón"
+    />
+
+    {/* LINK BOTÓN */}
+    <input
+      className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+      value={home.boton_link ?? ''}
+      onChange={e =>
+        setHome({ ...home, boton_link: e.target.value })
+      }
+      placeholder="Link del botón (https://...)"
+    />
+
+    {/* FLYER */}
+    <div className="space-y-2">
+      <div className="text-sm text-zinc-400">Flyer</div>
+      {home.flyer_url && (
+        <img src={home.flyer_url} className="max-h-64 rounded-lg" />
+      )}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={e =>
+          e.target.files &&
+          subirArchivoHome(e.target.files[0], 'flyer')
+        }
+      />
+    </div>
+
+    {/* VIDEO */}
+    <div className="space-y-2">
+      <div className="text-sm text-zinc-400">Video</div>
+      {home.video_url && (
+        <video src={home.video_url} controls className="max-h-64 rounded-lg" />
+      )}
+      <input
+        type="file"
+        accept="video/*"
+        onChange={e =>
+          e.target.files &&
+          subirArchivoHome(e.target.files[0], 'video')
+        }
+      />
+    </div>
+
+    <button
+      onClick={guardarHome}
+      disabled={savingHome}
+      className="bg-green-600 text-white px-4 py-2 rounded-lg"
+    >
+      {savingHome ? 'Guardando...' : 'Guardar cambios'}
+    </button>
+  </div>
+)}
+
 
     </div>
   )

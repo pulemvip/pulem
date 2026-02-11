@@ -88,6 +88,9 @@ export default function Home() {
           sm:justify-center
         "
       >
+        <h1 className="text-2xl font-bold sm:text-3xl md:text-4xl">
+          {content?.titulo}
+        </h1>
         {content?.flyer_url && (
           <img
             src={content.flyer_url}

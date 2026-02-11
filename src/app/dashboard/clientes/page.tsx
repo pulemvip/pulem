@@ -431,6 +431,7 @@ Te escribo de PULEM VIP.
 
       {tabActual === 'invitados' && (
         <div className="space-y-4">
+
           {/* 1️⃣ CONTADORES */}
           <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex gap-4">
             <div className="flex-1 text-center bg-zinc-900 border border-zinc-800 rounded-xl p-3">
@@ -471,7 +472,10 @@ Te escribo de PULEM VIP.
               onChange={e => setSearchQuery(e.target.value)}
             />
 
-            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {/* Contenedor scrollable compatible con móvil */}
+            <div
+              className="space-y-2 max-h-[400px] overflow-y-auto touch-pan-y [-webkit-overflow-scrolling:touch]"
+            >
               {invitados
                 .filter(i => i.nombre.toLowerCase().includes(searchQuery.toLowerCase()))
                 .map(i => (
@@ -498,9 +502,6 @@ Te escribo de PULEM VIP.
           </div>
         </div>
       )}
-
-
-
 
       {/* RANKING */}
       {tabActual === 'ranking' && (

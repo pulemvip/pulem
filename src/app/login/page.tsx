@@ -1,72 +1,152 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+export default function RerollPage() {
+  const [preview, setPreview] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [total, setTotal] = useState<number | null>(null)
 
-  useEffect(() => {
-    // Verificar si ya hay sesión activa al cargar
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) router.push('/dashboard/clientes')
-    }
-    checkSession()
-  }, [router])
-
-  const login = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
+  const generarPreview = async () => {
     setLoading(true)
-    setError('')
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    const res = await fetch('/api/reroll', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ tipo: 'enviados', ejecutar: false }),
     })
 
+    const data = await res.json()
+
+    if (res.ok) {
+      setPreview(data.preview)
+      setTotal(data.total)
+    } else {
+      alert(data.error)
+    }
+
     setLoading(false)
-    if (error) setError(error.message)
-    else router.push('/dashboard/clientes')
+  }
+
+  const confirmar = async () => {
+    if (!confirm('¿Seguro que querés ejecutar el reroll?')) return
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    await fetch('/api/reroll', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ tipo: 'enviados', ejecutar: true }),
+    })
+
+    alert('Reroll ejecutado')
+    setPreview([])
+    setTotal(null)
   }
 
   return (
-    <main className="flex items-center justify-center h-[100dvh] overflow-hidden bg-gradient-to-br from-black via-gray-900 to-blue-900">
-      <div className="w-96 max-w-[90vw] p-8 bg-gray-900/80 backdrop-blur-md rounded-3xl shadow-2xl space-y-6 flex flex-col items-center transition duration-500 sm:hover:scale-105">
+    <main className="min-h-screen bg-black p-12">
+      <div className="max-w-6xl mx-auto space-y-10">
 
-        <div className="w-32 h-32 relative">
-          <Image src="/logo.png" alt="Logo" fill className="object-contain" priority />
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-white tracking-tight">
+            Reroll de Clientes
+          </h1>
+          <p className="text-gray-500 mt-2">
+            Redistribución manual de clientes con estado <b>enviado</b>
+          </p>
         </div>
 
-        <form className="w-full flex flex-col gap-4" onSubmit={login}>
-          <input
-            className="w-full border border-gray-700 rounded-xl p-3 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-            placeholder="Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
-          <input
-            type="password"
-            className="w-full border border-gray-700 rounded-xl p-3 bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition"
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+        {/* Card acción */}
+        <div className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-6 shadow-xl flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">
+              Generar Preview
+            </h2>
+            <p className="text-gray-500 text-sm">
+              Simulación sin modificar la base
+            </p>
+          </div>
+
           <button
-            type="submit"
+            onClick={generarPreview}
             disabled={loading}
-            className="w-full bg-blue-600 text-white p-3 rounded-xl font-semibold hover:bg-blue-700 transition sm:hover:scale-105"
+            className="bg-blue-600 hover:bg-blue-700 transition text-white px-6 py-2 rounded-lg font-semibold disabled:opacity-50"
           >
-            Entrar
+            {loading ? 'Generando...' : 'Preview Enviados'}
           </button>
-        </form>
+        </div>
+
+        {/* Resultado */}
+        {total !== null && (
+          <div className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-6 shadow-xl space-y-6">
+
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-white">
+                Resultado ({total} cambios)
+              </h2>
+
+              <button
+                onClick={confirmar}
+                className="bg-red-600 hover:bg-red-700 transition text-white px-6 py-2 rounded-lg font-semibold"
+              >
+                Confirmar Reroll
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-[#1f1f1f]">
+              <table className="w-full text-sm">
+                <thead className="bg-[#141414]">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium">
+                      Cliente
+                    </th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium">
+                      Vendedor Actual
+                    </th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium">
+                      Vendedor Nuevo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((item) => (
+                    <tr
+                      key={item.cliente_id}
+                      className="border-t border-[#1f1f1f] hover:bg-[#161616] transition"
+                    >
+                      <td className="px-4 py-3 text-white font-medium">
+                        {item.cliente_nombre}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {item.vendedor_actual_nombre}
+                      </td>
+                      <td className="px-4 py-3 text-blue-400 font-medium">
+                        {item.vendedor_nuevo_nombre}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        )}
+
       </div>
     </main>
   )

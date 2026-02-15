@@ -95,15 +95,6 @@ export default function DashboardLayout({
                     >
                       🛠 Panel Admin
                     </Link>
-
-                    <Link
-                      href="/dashboard/clientes"
-                      onClick={() => setShowMenu(false)}
-                      className="block px-5 py-3 text-sm hover:bg-blue-500/10 transition"
-                    >
-                      👥 Clientes
-                    </Link>
-
                   </div>
                 </motion.div>
               )}

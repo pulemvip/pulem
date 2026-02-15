@@ -121,20 +121,13 @@ export default function RerollPage() {
                 Reroll de Clientes
               </h1>
 
-              {/* ADMIN BADGE */}
-              <span className="px-3 py-1 text-xs font-semibold tracking-wider rounded-full 
-                               bg-red-600/20 text-red-400 border border-red-600/40">
-                ADMIN
-              </span>
             </div>
 
             <p className="text-zinc-400">
               Redistribución inteligente de clientes con estado{' '}
-              <span className="text-blue-500 font-semibold">enviado</span>
+              <span className="text-blue-500 font-semibold">pendiente</span>
             </p>
           </div>
-
-          <div className="text-sm text-zinc-400">admin@email.com</div>
         </div>
 
         {/* MÉTRICAS */}

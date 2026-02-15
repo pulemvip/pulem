@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+export const runtime = 'nodejs'
 
 const ADMIN_ID = '732b5ed0-351a-459b-926c-a30a0cf75d54'
 

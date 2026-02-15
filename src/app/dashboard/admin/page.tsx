@@ -64,14 +64,19 @@ export default function AdminPage() {
     total > 0 ? Math.round((enviados / total) * 100) : 0
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Panel Admin</h1>
+    <div className="space-y-8 px-4 sm:px-6 lg:px-8 py-6">
+      <h1 className="text-2xl sm:text-3xl font-bold text-center sm:text-left">
+        Panel Admin
+      </h1>
 
       {loading ? (
-        <div className="text-zinc-500">Cargando métricas...</div>
+        <div className="text-zinc-500 text-center sm:text-left">
+          Cargando métricas...
+        </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          {/* GRID RESPONSIVE */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
             <Card title="Clientes Totales" value={total} />
             <Card title="Pendientes" value={pendientes} />
             <Card title="Enviados" value={enviados} />
@@ -79,15 +84,16 @@ export default function AdminPage() {
             <Card title="Vendedores Activos" value={vendedoresActivos} />
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
-            <p className="text-sm text-zinc-500">Progreso general</p>
-            <p className="text-2xl font-bold mt-2">
+          {/* PROGRESO */}
+          <div className="bg-zinc-900 border border-zinc-800 p-4 sm:p-6 rounded-2xl">
+            <p className="text-sm sm:text-base text-zinc-400">Progreso general</p>
+            <p className="text-xl sm:text-2xl font-bold mt-2">
               {porcentajeAsignado}% asignado
             </p>
 
-            <div className="w-full bg-zinc-800 rounded-full h-3 mt-4">
+            <div className="w-full bg-zinc-800 rounded-full h-2 sm:h-3 mt-3 sm:mt-4">
               <div
-                className="bg-blue-600 h-3 rounded-full transition-all"
+                className="bg-blue-600 h-2 sm:h-3 rounded-full transition-all"
                 style={{ width: `${porcentajeAsignado}%` }}
               />
             </div>
@@ -100,9 +106,9 @@ export default function AdminPage() {
 
 function Card({ title, value }: { title: string; value: number }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-md">
-      <p className="text-sm text-zinc-500">{title}</p>
-      <p className="text-3xl font-bold mt-2">{value}</p>
+    <div className="bg-zinc-900 border border-zinc-800 p-4 sm:p-6 rounded-2xl shadow-md flex flex-col justify-between">
+      <p className="text-sm sm:text-base text-zinc-400">{title}</p>
+      <p className="text-2xl sm:text-3xl font-bold mt-2">{value}</p>
     </div>
   )
 }
@@ -114,9 +120,7 @@ function getISOWeek() {
 
   const oneJan = new Date(year, 0, 1)
   const numberOfDays =
-    Math.floor(
-      (now.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000)
-    ) + 1
+    Math.floor((now.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000)) + 1
 
   const week = Math.ceil(numberOfDays / 7)
 

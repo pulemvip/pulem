@@ -12,13 +12,16 @@ import {
   UserCog,
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react'
 
 type Rol = 'admin' | 'vendedor'
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(true)        // desktop collapse
+  const [mobileOpen, setMobileOpen] = useState(false) // mobile drawer
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState<string | null>(null)
   const [rol, setRol] = useState<Rol | null>(null)
@@ -55,24 +58,29 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }, [router])
 
   useEffect(() => {
-  if (!rol) return
+    if (!rol) return
 
-  const vendedorAllowedRoutes = [
-    '/dashboard/admin',
-    '/dashboard/admin/historial'
-  ]
+    const vendedorAllowedRoutes = [
+      '/dashboard/admin',
+      '/dashboard/admin/historial'
+    ]
 
-  if (rol === 'vendedor') {
-    const allowed = vendedorAllowedRoutes.some(route =>
-      pathname.startsWith(route)
-    )
+    if (rol === 'vendedor') {
+      const allowed = vendedorAllowedRoutes.some(route =>
+        pathname.startsWith(route)
+      )
 
-    if (!allowed) {
-      router.replace('/dashboard/admin')
+      if (!allowed) {
+        router.replace('/dashboard/admin')
+      }
     }
-  }
 
-}, [rol, pathname, router])
+  }, [rol, pathname, router])
+
+  // Cerrar sidebar mobile cuando cambia ruta
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
 
   if (loading) {
     return (
@@ -83,21 +91,39 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   const links = [
-  { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard, roles: ['admin', 'vendedor'] },
-  { name: 'Historial', href: '/dashboard/admin/historial', icon: History, roles: ['admin', 'vendedor'] },
-
-  { name: 'Reroll', href: '/dashboard/admin/reroll', icon: RefreshCcw, roles: ['admin'] },
-  { name: 'Clientes', href: '/dashboard/admin/clientes', icon: Users, roles: ['admin'] },
-  { name: 'Vendedores', href: '/dashboard/admin/vendedores', icon: UserCog, roles: ['admin'] },
-  { name: 'Configuración', href: '/dashboard/admin/configuracion', icon: Settings, roles: ['admin'] },
-]
-
+    { name: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard, roles: ['admin', 'vendedor'] },
+    { name: 'Historial', href: '/dashboard/admin/historial', icon: History, roles: ['admin', 'vendedor'] },
+    { name: 'Reroll', href: '/dashboard/admin/reroll', icon: RefreshCcw, roles: ['admin'] },
+    { name: 'Clientes', href: '/dashboard/admin/clientes', icon: Users, roles: ['admin'] },
+    { name: 'Vendedores', href: '/dashboard/admin/vendedores', icon: UserCog, roles: ['admin'] },
+    { name: 'Configuración', href: '/dashboard/admin/configuracion', icon: Settings, roles: ['admin'] },
+  ]
 
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-100">
 
+      {/* OVERLAY MOBILE */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside className={`relative flex flex-col bg-gradient-to-b from-zinc-900 to-zinc-950 border-r border-zinc-800 transition-all duration-300 ${open ? 'w-64' : 'w-20'}`}>
+      <aside
+        className={`
+          fixed z-50 md:relative
+          h-full
+          bg-gradient-to-b from-zinc-900 to-zinc-950
+          border-r border-zinc-800
+          transition-all duration-300
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
+          ${open ? 'md:w-64' : 'md:w-20'}
+          w-64
+        `}
+      >
 
         {/* HEADER */}
         <div className="flex items-center justify-between p-4 border-b border-zinc-800">
@@ -105,21 +131,28 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             {open ? 'Pulem' : 'P'}
           </span>
 
+          {/* Desktop collapse */}
           <button
             onClick={() => setOpen(!open)}
-            className="p-1 bg-zinc-800 rounded hover:bg-zinc-700 transition"
+            className="hidden md:block p-1 bg-zinc-800 rounded hover:bg-zinc-700 transition"
           >
             {open ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+          </button>
+
+          {/* Mobile close */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="md:hidden p-1 bg-zinc-800 rounded hover:bg-zinc-700 transition"
+          >
+            <X size={18} />
           </button>
         </div>
 
         {/* NAV */}
-        <nav className="flex-1 px-2 py-4 space-y-2">
-
+        <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto">
           {links
             .filter(link => rol && link.roles.includes(rol))
             .map(link => {
-
               const active = pathname === link.href
               const Icon = link.icon
 
@@ -135,19 +168,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   `}
                 >
                   <Icon size={18} />
-
-                  {open && <span>{link.name}</span>}
-
-                  {!open && (
-                    <span className="absolute left-20 bg-zinc-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition pointer-events-none">
-                      {link.name}
-                    </span>
-                  )}
+                  <span className="md:block">{link.name}</span>
                 </Link>
               )
-            })
-          }
-
+            })}
         </nav>
 
         {/* FOOTER */}
@@ -156,16 +180,25 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             href="/dashboard/clientes"
             className="flex items-center justify-center gap-2 text-sm bg-zinc-800 hover:bg-zinc-700 transition rounded-lg px-3 py-2 font-medium"
           >
-            {open ? '← Volver a Clientes' : '←'}
+            ← Volver a Clientes
           </Link>
         </div>
 
       </aside>
 
       {/* MAIN */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full">
 
-        <header className="flex justify-between items-center bg-zinc-900 border-b border-zinc-800 px-6 py-4">
+        {/* HEADER */}
+        <header className="flex justify-between items-center bg-zinc-900 border-b border-zinc-800 px-4 md:px-6 py-4">
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="md:hidden p-2 bg-zinc-800 rounded"
+          >
+            <Menu size={18} />
+          </button>
 
           <h1 className="text-lg font-semibold">
             Panel
@@ -173,7 +206,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-3">
 
-            <span className="text-sm text-zinc-300">
+            <span className="hidden sm:block text-sm text-zinc-300">
               {email}
             </span>
 
@@ -193,7 +226,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
           {children}
         </main>
 

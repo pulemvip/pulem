@@ -73,7 +73,7 @@ export default function Home() {
       sm:px-5 sm:py-2 sm:text-base
     "
         >
-          Acceso dueños
+          Acceso Administrativos
         </Link>
       </div>
 

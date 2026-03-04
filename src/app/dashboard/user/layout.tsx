@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu,
@@ -19,6 +19,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Receipt,
 } from 'lucide-react'
 
 export default function DashboardLayout({
@@ -27,6 +28,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
 
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string>('cliente')
@@ -66,7 +68,7 @@ export default function DashboardLayout({
       const { data } = await supabase.auth.getUser()
 
       if (!data.user) {
-        window.location.href = '/login'
+        router.push('/login')
         return
       }
 
@@ -82,11 +84,11 @@ export default function DashboardLayout({
     }
 
     getUser()
-  }, [])
+  }, [router])
 
   const cerrarSesion = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    router.push('/login')
   }
 
   const toggleCategory = (key: string) => {
@@ -105,7 +107,7 @@ export default function DashboardLayout({
       items: [
         { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
         { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
-        { href: '/dashboard/user/consumos', label: 'Consumos', icon: UserCheck },
+        { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
       ],
     },
     {
@@ -134,15 +136,10 @@ export default function DashboardLayout({
         <div className="px-4 md:px-6 h-16 flex items-center justify-between">
 
           <div className="flex items-center gap-4">
-            {/* Botón mobile */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden"
-            >
+            <button onClick={() => setMobileOpen(true)} className="md:hidden">
               <Menu size={22} />
             </button>
 
-            {/* Botón colapsar desktop */}
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="hidden md:block"
@@ -181,7 +178,6 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* ================= BODY ================= */}
       <div className="flex flex-1 relative">
 
         {/* ===== SIDEBAR DESKTOP ===== */}
@@ -232,72 +228,61 @@ export default function DashboardLayout({
           </div>
         </motion.aside>
 
-        {/* ===== MOBILE DRAWER ===== */}
-        <AnimatePresence>
-          {mobileOpen && (
-            <>
-              <motion.aside
-                initial={{ x: -320 }}
-                animate={{ x: 0 }}
-                exit={{ x: -320 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-                className="fixed top-0 left-0 h-full w-72 bg-[#0f0f14] border-r border-zinc-800 p-6 z-[60] md:hidden shadow-2xl"
-              >
-                <div className="flex items-center justify-between mb-6">
-                  <span className="text-sm text-zinc-400">Menú</span>
-                  <button onClick={() => setMobileOpen(false)}>
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {categories.map(cat =>
-                  cat.items.length > 0 ? (
-                    <div key={cat.key} className="mb-6">
-                      <div className="text-xs uppercase text-zinc-500 mb-2">
-                        {cat.label}
-                      </div>
-
-                      {cat.items.map(item => {
-                        const Icon = item.icon
-                        const active = pathname === item.href
-
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setMobileOpen(false)}
-                            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
-                              active
-                                ? 'bg-zinc-800 text-white'
-                                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                            }`}
-                          >
-                            <Icon size={18} />
-                            {item.label}
-                          </Link>
-                        )
-                      })}
-                    </div>
-                  ) : null
-                )}
-              </motion.aside>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/60 z-[50] md:hidden"
-                onClick={() => setMobileOpen(false)}
-              />
-            </>
-          )}
-        </AnimatePresence>
-
         {/* ===== CONTENT ===== */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto">
           {children}
         </main>
       </div>
+
+      {/* ================= MODAL LOGOUT ================= */}
+      <AnimatePresence>
+        {showLogoutModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[70]"
+              onClick={() => setShowLogoutModal(false)}
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex items-center justify-center z-[80]"
+            >
+              <div className="bg-[#111118] border border-zinc-800 rounded-xl p-6 w-[90%] max-w-sm shadow-xl">
+                <h2 className="text-lg font-semibold mb-4">
+                  ¿Cerrar sesión?
+                </h2>
+
+                <p className="text-sm text-zinc-400 mb-6">
+                  Vas a salir de tu cuenta actual.
+                </p>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowLogoutModal(false)}
+                    className="px-4 py-2 text-sm rounded-lg border border-zinc-700 hover:bg-zinc-800"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    onClick={cerrarSesion}
+                    className="px-4 py-2 text-sm rounded-lg bg-red-600 hover:bg-red-700"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
     </div>
   )
 }

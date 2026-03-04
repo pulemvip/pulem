@@ -110,7 +110,10 @@ export default function Home() {
 
       <div className="relative z-20 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
         {/* HEADER */}
-        <div className="mb-4 flex justify-between items-center">
+        <div
+          className="flex justify-between items-center"
+          style={{ marginBottom: '0.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
+        >
           <Image src={logoSrc} alt="Logo" width={140} height={50} className="drop-shadow-lg" />
           <Link
             href="/login"

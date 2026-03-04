@@ -139,7 +139,7 @@ export default function Home() {
                 className={`group relative rounded-2xl overflow-hidden shadow-xl transition duration-300 hover:scale-[1.02] bg-zinc-900 ${marginClass}`}
               >
                 {event.flyer_url && (
-                  <div className="relative w-full h-64 sm:h-80 md:h-96 overflow-hidden">
+                  <div className="relative w-full h-80 sm:h-80 md:h-96 overflow-hidden">
                     <img
                       src={event.flyer_url}
                       alt={event.titulo}

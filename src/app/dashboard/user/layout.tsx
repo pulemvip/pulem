@@ -184,7 +184,7 @@ export default function DashboardLayout({
         <motion.aside
           animate={{ width: sidebarCollapsed ? 80 : 260 }}
           transition={{ duration: 0.25 }}
-          className="hidden md:flex flex-col bg-[#0f0f14] border-r border-zinc-800 p-4"
+          className="hidden md:flex flex-col bg-[#0f0f14] border-r border-zinc-800 p-4 h-screen sticky top-16"
         >
           <div className="flex-1 overflow-y-auto space-y-6 pr-1">
             {categories.map(cat => (
@@ -212,11 +212,10 @@ export default function DashboardLayout({
                       <Link
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${
-                          active
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${active
                             ? 'bg-zinc-800 text-white'
                             : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                        }`}
+                          }`}
                       >
                         <Icon size={18} />
                         {!sidebarCollapsed && item.label}
@@ -233,6 +232,79 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* ================= SIDEBAR MOBILE ================= */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[60] md:hidden"
+              onClick={() => setMobileOpen(false)}
+            />
+
+            {/* Sidebar */}
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ duration: 0.25 }}
+              className="fixed top-0 left-0 h-full w-64 bg-[#0f0f14] border-r border-zinc-800 p-4 z-[70] md:hidden"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-sm text-zinc-400">Menú</span>
+                <button onClick={() => setMobileOpen(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {categories.map(cat => (
+                  <div key={cat.key}>
+                    {cat.items.length > 0 && (
+                      <button
+                        onClick={() => toggleCategory(cat.key)}
+                        className="flex items-center justify-between w-full text-xs uppercase tracking-wide text-zinc-500 mb-2"
+                      >
+                        {cat.label}
+                        {openCategories[cat.key] ? (
+                          <ChevronUp size={14} />
+                        ) : (
+                          <ChevronDown size={14} />
+                        )}
+                      </button>
+                    )}
+
+                    {openCategories[cat.key] &&
+                      cat.items.map(item => {
+                        const active = pathname === item.href
+                        const Icon = item.icon
+
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMobileOpen(false)}
+                            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${active
+                                ? 'bg-zinc-800 text-white'
+                                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                              }`}
+                          >
+                            <Icon size={18} />
+                            {item.label}
+                          </Link>
+                        )
+                      })}
+                  </div>
+                ))}
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ================= MODAL LOGOUT ================= */}
       <AnimatePresence>

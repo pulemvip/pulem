@@ -87,19 +87,19 @@ export default function ConsumosPage() {
   }
 
   const copiarTodo = async () => {
-  if (consumos.length === 0) return
+    if (consumos.length === 0) return
 
-  const hoy = new Date().toLocaleDateString('es-AR')
+    const hoy = new Date().toLocaleDateString('es-AR')
 
-  const free = consumos
-    .filter(c => c.tipo === 'free')
-    .map(c => c.nombre)
+    const free = consumos
+      .filter(c => c.tipo === 'free')
+      .map(c => c.nombre)
 
-  const descuento = consumos
-    .filter(c => c.tipo === 'descuento')
-    .map(c => c.nombre)
+    const descuento = consumos
+      .filter(c => c.tipo === 'descuento')
+      .map(c => c.nombre)
 
-  const texto = `CONSUMOS ${hoy}
+    const texto = `CONSUMOS ${hoy}
 
 Nombre Combo Free
 ${free.join('\n')}
@@ -107,9 +107,9 @@ ${free.join('\n')}
 Nombre Descuento en Combo
 ${descuento.join('\n')}`
 
-  await navigator.clipboard.writeText(texto.trim())
-  alert('Copiado correctamente')
-}
+    await navigator.clipboard.writeText(texto.trim())
+    alert('Copiado correctamente')
+  }
 
   const totalFree = consumos.filter(c => c.tipo === 'free').length
   const totalDescuento = consumos.filter(c => c.tipo === 'descuento').length
@@ -123,7 +123,7 @@ ${descuento.join('\n')}`
     <div className="space-y-4">
 
       {/* CONTADORES */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex gap-4">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row gap-4">
 
         <div className="flex-1 text-center bg-zinc-900 border border-zinc-800 rounded-xl p-3">
           <div className="text-xs text-zinc-400">Combo Free</div>
@@ -148,46 +148,51 @@ ${descuento.join('\n')}`
       </div>
 
       {/* AGREGAR */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 flex gap-2">
-        <input
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100 placeholder-zinc-500"
-          placeholder="Nombre del cliente"
-          value={nuevoNombre}
-          onChange={e => setNuevoNombre(e.target.value)}
-        />
+      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row gap-2">
 
-        <select
-          value={tipo}
-          onChange={e => setTipo(e.target.value as any)}
-          className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-        >
-          <option value="free">Free 🎁</option>
-          <option value="descuento">Descuento 💸</option>
-        </select>
+          <input
+            className="w-full sm:flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100 placeholder-zinc-500"
+            placeholder="Nombre del cliente"
+            value={nuevoNombre}
+            onChange={e => setNuevoNombre(e.target.value)}
+          />
 
-        <button
-          onClick={agregarConsumo}
-          className="bg-green-600 text-white px-4 rounded-lg"
-        >
-          Agregar
-        </button>
+          <select
+            value={tipo}
+            onChange={e => setTipo(e.target.value as any)}
+            className="w-full sm:w-auto bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
+          >
+            <option value="free">Free</option>
+            <option value="descuento">Descuento</option>
+          </select>
+
+          <button
+            onClick={agregarConsumo}
+            className="w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded-lg"
+          >
+            Agregar
+          </button>
+
+        </div>
       </div>
 
       {/* BUSCADOR + LISTA */}
       <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3">
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
+
           <input
             type="text"
             placeholder="Buscar cliente..."
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100 placeholder-zinc-500"
+            className="w-full sm:flex-1 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100 placeholder-zinc-500"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
 
           <button
             onClick={copiarTodo}
-            className="bg-blue-600 text-white px-4 rounded-lg text-sm"
+            className="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
           >
             Copiar
           </button>
@@ -195,11 +200,12 @@ ${descuento.join('\n')}`
           {userRole === 'admin' && (
             <button
               onClick={limpiarLista}
-              className="bg-red-600 text-white px-4 rounded-lg text-sm"
+              className="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded-lg text-sm"
             >
               Limpiar
             </button>
           )}
+
         </div>
 
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -216,8 +222,8 @@ ${descuento.join('\n')}`
                   <div className="font-medium">{c.nombre}</div>
                   <div className="text-xs text-zinc-400">
                     {c.tipo === 'free'
-                      ? 'Combo Free 🎁'
-                      : 'Combo Descuento 💸'}
+                      ? 'Combo Free'
+                      : 'Combo Descuento'}
                   </div>
                 </div>
 

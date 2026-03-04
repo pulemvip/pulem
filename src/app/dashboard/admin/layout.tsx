@@ -177,7 +177,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* FOOTER */}
         <div className="p-4 border-t border-zinc-800">
           <Link
-            href="/dashboard/clientes"
+            href="/dashboard/user"
             className="flex items-center justify-center gap-2 text-sm bg-zinc-800 hover:bg-zinc-700 transition rounded-lg px-3 py-2 font-medium"
           >
             ← Volver a Clientes

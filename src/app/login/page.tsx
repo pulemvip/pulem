@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) setError(error.message);
-    else router.push('/dashboard/clientes');
+    else router.push('/dashboard/user');
   };
 
   return (

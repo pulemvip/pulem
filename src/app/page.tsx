@@ -35,7 +35,7 @@ export default function Home() {
       setTimeout(() => {
         if (!error && data) setEvents(data)
         setLoading(false)
-      }, 1500)
+      }, 1000)
     }
 
     fetchEvents()

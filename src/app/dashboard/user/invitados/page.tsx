@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarAccion } from '@/lib/historial'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Copy, Trash2, Search, CheckCheck, X } from 'lucide-react'
 
@@ -18,7 +19,6 @@ type Toast = {
   type: 'success' | 'error'
 }
 
-/* ===== TOAST ===== */
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
   return (
     <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-[100] flex flex-col gap-2 items-stretch sm:items-end pointer-events-none">
@@ -45,7 +45,6 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
   )
 }
 
-/* ===== STAT CARD ===== */
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex-1 bg-[#0f0f14] border border-zinc-800 rounded-2xl py-4 px-2 text-center">
@@ -55,7 +54,6 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   )
 }
 
-/* ===== AVATAR INICIAL ===== */
 function Avatar({ email }: { email: string }) {
   const initials = email.split('@')[0].slice(0, 2).toUpperCase()
   return (
@@ -85,15 +83,10 @@ export default function InvitadosPage() {
     const cargarTodo = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/login'; return }
-
       setUserIdActual(user.id)
-
-      const { data: perfil } = await supabase
-        .from('usuarios').select('rol').eq('id', user.id).single()
+      const { data: perfil } = await supabase.from('usuarios').select('rol').eq('id', user.id).single()
       if (perfil?.rol) setUserRole(perfil.rol)
-
-      const { data } = await supabase
-        .from('invitados').select('*').order('nombre')
+      const { data } = await supabase.from('invitados').select('*').order('nombre')
       setInvitados((data as Invitado[]) || [])
       setLoading(false)
     }
@@ -101,15 +94,13 @@ export default function InvitadosPage() {
   }, [])
 
   const cargarInvitados = async () => {
-    const { data } = await supabase
-      .from('invitados').select('*').order('nombre')
+    const { data } = await supabase.from('invitados').select('*').order('nombre')
     setInvitados((data as Invitado[]) || [])
   }
 
   const agregarInvitado = async () => {
     if (!nuevoInvitado.trim()) return
     setAgregando(true)
-
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -122,6 +113,10 @@ export default function InvitadosPage() {
     if (error) {
       addToast('Error al agregar invitado', 'error')
     } else {
+      await registrarAccion({
+        accion: 'invitado_agregado',
+        detalle: nuevoInvitado.trim(),
+      })
       addToast(`"${nuevoInvitado.trim()}" agregado`, 'success')
       setNuevoInvitado('')
       await cargarInvitados()
@@ -132,10 +127,13 @@ export default function InvitadosPage() {
   const eliminarInvitado = async (id: number, nombre: string) => {
     const { error } = await supabase
       .from('invitados').delete().eq('id', id).eq('user_id', userIdActual)
-
     if (error) {
       addToast('Error al eliminar', 'error')
     } else {
+      await registrarAccion({
+        accion: 'invitado_eliminado',
+        detalle: nombre,
+      })
       setInvitados(prev => prev.filter(i => i.id !== id))
       addToast(`"${nombre}" eliminado`, 'success')
     }
@@ -143,10 +141,16 @@ export default function InvitadosPage() {
 
   const limpiarLista = async () => {
     if (userRole !== 'admin') return
+    const total = invitados.length
     const { error } = await supabase.from('invitados').delete().neq('id', 0)
     if (error) {
       addToast('Error al limpiar la lista', 'error')
     } else {
+      await registrarAccion({
+        accion: 'invitados_limpiados',
+        detalle: `${total} invitados eliminados`,
+        metadata: { total },
+      })
       setInvitados([])
       addToast('Lista limpiada', 'success')
     }
@@ -160,10 +164,7 @@ export default function InvitadosPage() {
     addToast('Lista copiada al portapapeles', 'success')
   }
 
-  const filtrados = invitados.filter(i =>
-    i.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
+  const filtrados = invitados.filter(i => i.nombre.toLowerCase().includes(searchQuery.toLowerCase()))
   const misInvitados = invitados.filter(i => i.user_id === userIdActual).length
 
   if (loading) {
@@ -177,29 +178,24 @@ export default function InvitadosPage() {
   return (
     <>
       <ToastContainer toasts={toasts} />
-
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
         className="max-w-2xl mx-auto space-y-5 pb-24"
       >
-        {/* HEADER */}
         <div>
           <h1 className="text-xl font-semibold text-white">Invitados</h1>
           <p className="text-sm text-zinc-500 mt-1">Listado del día</p>
         </div>
 
-        {/* STATS */}
         <div className="flex gap-2">
           <StatCard label="Total invitados" value={invitados.length} color="text-amber-400" />
           <StatCard label="Tus invitados" value={misInvitados} color="text-emerald-400" />
         </div>
 
-        {/* FORM AGREGAR */}
         <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-4 space-y-3">
           <p className="text-xs text-zinc-500 uppercase tracking-wide">Agregar invitado</p>
-
           <input
             className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3.5 text-base text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
             placeholder="Nombre del invitado"
@@ -209,7 +205,6 @@ export default function InvitadosPage() {
             autoComplete="off"
             autoCorrect="off"
           />
-
           <button
             onClick={agregarInvitado}
             disabled={agregando || !nuevoInvitado.trim()}
@@ -220,10 +215,7 @@ export default function InvitadosPage() {
           </button>
         </div>
 
-        {/* LISTA */}
         <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-4 space-y-4">
-
-          {/* Buscador */}
           <div className="relative">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
@@ -235,7 +227,6 @@ export default function InvitadosPage() {
             />
           </div>
 
-          {/* Acciones */}
           <div className="flex gap-2">
             <button
               onClick={copiarLista}
@@ -245,7 +236,6 @@ export default function InvitadosPage() {
               <Copy size={15} />
               Copiar lista
             </button>
-
             {userRole === 'admin' && (
               <button
                 onClick={limpiarLista}
@@ -258,18 +248,11 @@ export default function InvitadosPage() {
             )}
           </div>
 
-          {/* Items */}
           <div className="space-y-2">
             <AnimatePresence initial={false}>
               {filtrados.length === 0 ? (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-zinc-600 text-center py-10"
-                >
-                  {searchQuery
-                    ? 'Sin resultados para esa búsqueda.'
-                    : 'Todavía no hay invitados registrados.'}
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-zinc-600 text-center py-10">
+                  {searchQuery ? 'Sin resultados para esa búsqueda.' : 'Todavía no hay invitados registrados.'}
                 </motion.p>
               ) : (
                 filtrados.map((i, idx) => (
@@ -288,7 +271,6 @@ export default function InvitadosPage() {
                         <p className="text-[11px] text-zinc-500 truncate">{i.user_email}</p>
                       </div>
                     </div>
-
                     {i.user_id === userIdActual && (
                       <button
                         onClick={() => eliminarInvitado(i.id, i.nombre)}

@@ -2,7 +2,7 @@
   "name": "VIP Manager",
   "short_name": "VIP",
   "description": "Gestión de staff para eventos VIP",
-  "start_url": "/dashboard/user/consumos",
+  "start_url": "/dashboard/user",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0c0c0f",

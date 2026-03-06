@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
+import { MessageCircle, Lock, Unlock, CheckCheck, X, Save } from 'lucide-react'
 
 type Cliente = {
   id: number
@@ -12,212 +14,252 @@ type Cliente = {
   user_id: string
 }
 
-type Invitado = {
-  id: number
-  nombre: string
-  user_id: string
-  user_email: string
-}
-
-type RankingMensaje = {
-  user_id: string
-  user_email: string
-  total: number
-  ultima_semana_enviada: number
-}
+type Toast = { id: number; message: string; type: 'success' | 'error' }
 
 const getSemanaActual = (): number => {
   const hoy = new Date()
   const primerDiaAnio = new Date(hoy.getFullYear(), 0, 1)
-  const dias = Math.floor(
-    (hoy.getTime() - primerDiaAnio.getTime()) / (24 * 60 * 60 * 1000)
-  )
-  const semana = Math.ceil((dias + primerDiaAnio.getDay() + 1) / 7)
-  return Number(`${hoy.getFullYear()}${semana}`)
+  const dias = Math.floor((hoy.getTime() - primerDiaAnio.getTime()) / (24 * 60 * 60 * 1000))
+  return Number(`${hoy.getFullYear()}${Math.ceil((dias + primerDiaAnio.getDay() + 1) / 7)}`)
 }
 
-export default function ClientesPage() {
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-[100] flex flex-col gap-2 items-stretch sm:items-end pointer-events-none">
+      <AnimatePresence>
+        {toasts.map(t => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border shadow-xl text-sm font-medium ${
+              t.type === 'success'
+                ? 'bg-[#0f0f14] border-emerald-500/30 text-emerald-400'
+                : 'bg-[#0f0f14] border-red-500/30 text-red-400'
+            }`}
+          >
+            {t.type === 'success' ? <CheckCheck size={15} /> : <X size={15} />}
+            {t.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="flex-1 bg-[#0f0f14] border border-zinc-800 rounded-2xl py-4 px-2 text-center">
+      <p className="text-[11px] text-zinc-500 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+    </div>
+  )
+}
+
+export default function ClientesUserPage() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [mensaje, setMensaje] = useState('')
   const [loading, setLoading] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const [editandoMensaje, setEditandoMensaje] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
 
   const semanaActual = getSemanaActual()
+
+  const addToast = (message: string, type: 'success' | 'error') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
+  }
 
   useEffect(() => {
     const cargarTodo = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login'
-        return
-      }
+      if (!user) { window.location.href = '/login'; return }
 
-      const { data: clientesData } = await supabase
-        .from('clientes')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('nombre')
+      const [{ data: clientesData }, { data: settings }] = await Promise.all([
+        supabase.from('clientes').select('*').eq('user_id', user.id).order('nombre'),
+        supabase.from('user_settings').select('mensaje').eq('user_id', user.id).single(),
+      ])
 
       setClientes((clientesData as Cliente[]) || [])
-
-      const { data: settings } = await supabase
-        .from('user_settings')
-        .select('mensaje')
-        .eq('user_id', user.id)
-        .single()
-
-      setMensaje(
-        settings?.mensaje ??
-        `Hola {{nombre}} 👋
-Te escribo de PULEM VIP.
-¿Te paso info de la próxima fecha? 🔥`
-      )
-
+      setMensaje(settings?.mensaje ?? `Hola {{nombre}} 👋\nTe escribo de PULEM VIP.\n¿Te paso info de la próxima fecha? 🔥`)
       setLoading(false)
     }
-
     cargarTodo()
-  }, [semanaActual])
+  }, [])
 
   const guardarMensaje = async () => {
+    setGuardando(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    await supabase.from('user_settings').upsert({
-      user_id: user.id,
-      mensaje,
-    })
-
-    alert('Mensaje guardado')
+    const { error } = await supabase.from('user_settings').upsert({ user_id: user.id, mensaje })
+    if (error) addToast('Error al guardar', 'error')
+    else { addToast('Mensaje guardado', 'success'); setEditandoMensaje(false) }
+    setGuardando(false)
   }
 
   const enviarWhatsapp = async (cliente: Cliente) => {
     const texto = mensaje.replace('{{nombre}}', cliente.nombre)
-    const encoded = encodeURIComponent(texto)
+    window.open(`https://wa.me/${cliente.telefono}?text=${encodeURIComponent(texto)}`, '_blank')
 
-    window.open(`https://wa.me/${cliente.telefono}?text=${encoded}`, '_blank')
+    await supabase.from('clientes').update({
+      estado: 'enviado',
+      ultima_semana_enviada: semanaActual,
+    }).eq('id', cliente.id)
 
-    await supabase
-      .from('clientes')
-      .update({
-        estado: 'enviado',
-        ultima_semana_enviada: semanaActual,
-      })
-      .eq('id', cliente.id)
-
-    setClientes(prev =>
-      prev.map(c =>
-        c.id === cliente.id
-          ? { ...c, ultima_semana_enviada: semanaActual }
-          : c
-      )
-    )
+    setClientes(prev => prev.map(c =>
+      c.id === cliente.id ? { ...c, ultima_semana_enviada: semanaActual } : c
+    ))
+    addToast(`Mensaje enviado a ${cliente.nombre}`, 'success')
   }
 
   const resumen = useMemo(() => {
-    const disponibles = clientes.filter(
-      c => c.ultima_semana_enviada !== semanaActual
-    ).length
-
-    const bloqueados = clientes.length - disponibles
-
-    return {
-      total: clientes.length,
-      disponibles,
-      bloqueados,
-    }
+    const disponibles = clientes.filter(c => c.ultima_semana_enviada !== semanaActual).length
+    return { total: clientes.length, disponibles, bloqueados: clientes.length - disponibles }
   }, [clientes, semanaActual])
 
-  if (loading) return null
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-300 animate-spin" />
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
+    <>
+      <ToastContainer toasts={toasts} />
 
-      {/* 🔢 RESUMEN */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-          <div className="text-xs text-zinc-400">Disponibles</div>
-          <div className="text-xl font-bold text-amber-300">
-            {resumen.disponibles}
-          </div>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="max-w-2xl mx-auto space-y-5 pb-24"
+      >
+        {/* Header */}
+        <div>
+          <h1 className="text-xl font-semibold text-white">Mis Clientes</h1>
+          <p className="text-sm text-zinc-500 mt-1">Semana {semanaActual}</p>
         </div>
 
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-          <div className="text-xs text-zinc-400">Bloqueados</div>
-          <div className="text-xl font-bold text-zinc-400">
-            {resumen.bloqueados}
-          </div>
+        {/* Stats */}
+        <div className="flex gap-2">
+          <StatCard label="Disponibles" value={resumen.disponibles} color="text-amber-400" />
+          <StatCard label="Bloqueados" value={resumen.bloqueados} color="text-zinc-500" />
+          <StatCard label="Total" value={resumen.total} color="text-white" />
         </div>
 
-        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-          <div className="text-xs text-zinc-400">Total</div>
-          <div className="text-xl font-bold">{resumen.total}</div>
-        </div>
-      </div>
-
-      {/* MENSAJE */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3">
-        <h2 className="font-semibold">Mensaje de WhatsApp</h2>
-
-        <textarea
-          rows={4}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3"
-          value={mensaje}
-          onChange={e => setMensaje(e.target.value)}
-        />
-
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-zinc-400">
-            Usá <b>{'{{nombre}}'}</b>
-          </span>
-          <button
-            onClick={guardarMensaje}
-            className="bg-zinc-100 text-zinc-900 px-4 py-2 rounded-lg text-sm font-medium"
-          >
-            Guardar
-          </button>
-        </div>
-      </div>
-
-      {/* CLIENTES */}
-      <div className="space-y-3">
-        {clientes.map(c => {
-          const bloqueado = c.ultima_semana_enviada === semanaActual
-          return (
-            <div
-              key={c.id}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-2"
+        {/* Mensaje WhatsApp */}
+        <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Mensaje de WhatsApp</p>
+            <button
+              onClick={() => setEditandoMensaje(p => !p)}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition"
             >
-              <div className="font-semibold">{c.nombre}</div>
-              <div className="text-sm text-zinc-400">{c.telefono}</div>
+              {editandoMensaje ? 'Cancelar' : 'Editar'}
+            </button>
+          </div>
 
-              <div className="flex justify-between items-center">
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
+          <AnimatePresence mode="wait">
+            {editandoMensaje ? (
+              <motion.div
+                key="edit"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-3"
+              >
+                <textarea
+                  rows={4}
+                  value={mensaje}
+                  onChange={e => setMensaje(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition resize-none"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-600">Usá <code className="text-zinc-400">{'{{nombre}}'}</code> para el nombre</span>
+                  <button
+                    onClick={guardarMensaje}
+                    disabled={guardando}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold disabled:opacity-40 transition"
+                  >
+                    <Save size={12} />
+                    {guardando ? 'Guardando...' : 'Guardar'}
+                  </button>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.pre
+                key="preview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-zinc-400 font-sans whitespace-pre-wrap leading-relaxed bg-zinc-900/50 rounded-xl px-4 py-3"
+              >
+                {mensaje}
+              </motion.pre>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Lista clientes */}
+        <div className="space-y-2">
+          {clientes.length === 0 ? (
+            <p className="text-sm text-zinc-600 text-center py-12">No tenés clientes asignados</p>
+          ) : (
+            clientes.map((c, idx) => {
+              const bloqueado = c.ultima_semana_enviada === semanaActual
+              return (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.02 }}
+                  className={`flex items-center gap-4 px-4 py-4 rounded-2xl border transition ${
                     bloqueado
-                      ? 'bg-zinc-800 text-zinc-400'
-                      : 'bg-amber-900/40 text-amber-300'
+                      ? 'border-zinc-800 bg-zinc-900/20 opacity-60'
+                      : 'border-zinc-800 bg-[#0f0f14]'
                   }`}
                 >
-                  {bloqueado ? 'Bloqueado' : 'Disponible'}
-                </span>
+                  {/* Ícono estado */}
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    bloqueado ? 'bg-zinc-800' : 'bg-emerald-500/10 border border-emerald-500/20'
+                  }`}>
+                    {bloqueado
+                      ? <Lock size={14} className="text-zinc-600" />
+                      : <Unlock size={14} className="text-emerald-400" />
+                    }
+                  </div>
 
-                <button
-                  disabled={bloqueado}
-                  onClick={() => enviarWhatsapp(c)}
-                  className={`px-3 py-1 rounded-lg text-sm ${
-                    bloqueado
-                      ? 'bg-zinc-800 text-zinc-500'
-                      : 'bg-green-600 text-white'
-                  }`}
-                >
-                  WhatsApp
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-100 truncate">{c.nombre}</p>
+                    <p className="text-xs text-zinc-600 mt-0.5">{c.telefono}</p>
+                  </div>
 
-    </div>
+                  {/* Botón */}
+                  <button
+                    disabled={bloqueado}
+                    onClick={() => enviarWhatsapp(c)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
+                      bloqueado
+                        ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                        : 'bg-emerald-600 text-white active:bg-emerald-700'
+                    }`}
+                  >
+                    <MessageCircle size={13} />
+                    {bloqueado ? 'Enviado' : 'WhatsApp'}
+                  </button>
+                </motion.div>
+              )
+            })
+          )}
+        </div>
+      </motion.div>
+    </>
   )
 }

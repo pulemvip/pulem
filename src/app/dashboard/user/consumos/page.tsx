@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarAccion } from '@/lib/historial'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Copy, Trash2, Search, CheckCheck, X } from 'lucide-react'
 
@@ -18,10 +19,8 @@ type Toast = {
   type: 'success' | 'error'
 }
 
-/* ===== TOAST ===== */
 function ToastContainer({ toasts }: { toasts: Toast[] }) {
   return (
-    // En mobile: centrado abajo con margen del borde. En desktop: esquina inferior derecha.
     <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-[100] flex flex-col gap-2 items-stretch sm:items-end">
       <AnimatePresence>
         {toasts.map(t => (
@@ -46,7 +45,6 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
   )
 }
 
-/* ===== STAT CARD ===== */
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className="flex-1 bg-[#0f0f14] border border-zinc-800 rounded-2xl py-4 px-2 text-center">
@@ -56,16 +54,13 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   )
 }
 
-/* ===== TIPO BADGE ===== */
 function TipoBadge({ tipo }: { tipo: 'free' | 'descuento' }) {
   return (
-    <span
-      className={`text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
-        tipo === 'free'
-          ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-          : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-      }`}
-    >
+    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+      tipo === 'free'
+        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+        : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+    }`}>
       {tipo === 'free' ? 'Free' : 'Dscto'}
     </span>
   )
@@ -92,15 +87,10 @@ export default function ConsumosPage() {
     const cargarTodo = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/login'; return }
-
       setUserIdActual(user.id)
-
-      const { data: perfil } = await supabase
-        .from('usuarios').select('rol').eq('id', user.id).single()
+      const { data: perfil } = await supabase.from('usuarios').select('rol').eq('id', user.id).single()
       if (perfil?.rol) setUserRole(perfil.rol)
-
-      const { data } = await supabase
-        .from('consumos').select('*').order('created_at', { ascending: true })
+      const { data } = await supabase.from('consumos').select('*').order('created_at', { ascending: true })
       setConsumos((data as Consumo[]) || [])
       setLoading(false)
     }
@@ -108,8 +98,7 @@ export default function ConsumosPage() {
   }, [])
 
   const cargarConsumos = async () => {
-    const { data } = await supabase
-      .from('consumos').select('*').order('created_at', { ascending: true })
+    const { data } = await supabase.from('consumos').select('*').order('created_at', { ascending: true })
     setConsumos((data as Consumo[]) || [])
   }
 
@@ -124,6 +113,10 @@ export default function ConsumosPage() {
     if (error) {
       addToast('Error al agregar consumo', 'error')
     } else {
+      await registrarAccion({
+        accion: 'consumo_agregado',
+        detalle: `${nuevoNombre.trim()} (${tipo})`,
+      })
       addToast(`"${nuevoNombre.trim()}" agregado`, 'success')
       setNuevoNombre('')
       setTipo('free')
@@ -134,11 +127,16 @@ export default function ConsumosPage() {
 
   const eliminarConsumo = async (id: string, ownerId: string) => {
     if (userRole !== 'admin' && ownerId !== userIdActual) return
-    const nombre = consumos.find(c => c.id === id)?.nombre ?? ''
+    const consumo = consumos.find(c => c.id === id)
+    const nombre = consumo?.nombre ?? ''
     const { error } = await supabase.from('consumos').delete().eq('id', id)
     if (error) {
       addToast('Error al eliminar', 'error')
     } else {
+      await registrarAccion({
+        accion: 'consumo_eliminado',
+        detalle: `${nombre} (${consumo?.tipo ?? ''})`,
+      })
       setConsumos(prev => prev.filter(c => c.id !== id))
       addToast(`"${nombre}" eliminado`, 'success')
     }
@@ -146,10 +144,16 @@ export default function ConsumosPage() {
 
   const limpiarLista = async () => {
     if (userRole !== 'admin') return
+    const total = consumos.length
     const { error } = await supabase.from('consumos').delete().neq('id', '')
     if (error) {
       addToast('Error al limpiar', 'error')
     } else {
+      await registrarAccion({
+        accion: 'consumos_limpiados',
+        detalle: `${total} consumos eliminados`,
+        metadata: { total },
+      })
       setConsumos([])
       addToast('Lista limpiada', 'success')
     }
@@ -165,10 +169,7 @@ export default function ConsumosPage() {
     addToast('Lista copiada al portapapeles', 'success')
   }
 
-  const filtrados = consumos.filter(c =>
-    c.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
+  const filtrados = consumos.filter(c => c.nombre.toLowerCase().includes(searchQuery.toLowerCase()))
   const totalFree = consumos.filter(c => c.tipo === 'free').length
   const totalDescuento = consumos.filter(c => c.tipo === 'descuento').length
   const misConsumos = consumos.filter(c => c.user_id === userIdActual).length
@@ -184,31 +185,25 @@ export default function ConsumosPage() {
   return (
     <>
       <ToastContainer toasts={toasts} />
-
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
         className="max-w-2xl mx-auto space-y-5 pb-24"
       >
-        {/* HEADER */}
         <div>
           <h1 className="text-xl font-semibold text-white">Consumos</h1>
           <p className="text-sm text-zinc-500 mt-1">Registrá los combos del día</p>
         </div>
 
-        {/* STATS — siempre en fila, tarjetas compactas */}
         <div className="flex gap-2">
           <StatCard label="Combo Free" value={totalFree} color="text-amber-400" />
           <StatCard label="Descuento" value={totalDescuento} color="text-blue-400" />
           <StatCard label="Tus consumos" value={misConsumos} color="text-emerald-400" />
         </div>
 
-        {/* FORM AGREGAR */}
         <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-4 space-y-3">
           <p className="text-xs text-zinc-500 uppercase tracking-wide">Agregar consumo</p>
-
-          {/* Input nombre — full width siempre */}
           <input
             className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3.5 text-base text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
             placeholder="Nombre del cliente"
@@ -218,8 +213,6 @@ export default function ConsumosPage() {
             autoComplete="off"
             autoCorrect="off"
           />
-
-          {/* Toggle tipo — full width en mobile, auto en desktop */}
           <div className="flex rounded-xl overflow-hidden border border-zinc-700">
             {(['free', 'descuento'] as const).map(t => (
               <button
@@ -227,9 +220,7 @@ export default function ConsumosPage() {
                 onClick={() => setTipo(t)}
                 className={`flex-1 py-3 text-sm font-medium transition ${
                   tipo === t
-                    ? t === 'free'
-                      ? 'bg-amber-500/20 text-amber-400'
-                      : 'bg-blue-500/20 text-blue-400'
+                    ? t === 'free' ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'
                     : 'text-zinc-500 active:bg-zinc-800'
                 }`}
               >
@@ -237,8 +228,6 @@ export default function ConsumosPage() {
               </button>
             ))}
           </div>
-
-          {/* Botón agregar — full width en mobile */}
           <button
             onClick={agregarConsumo}
             disabled={agregando || !nuevoNombre.trim()}
@@ -249,10 +238,7 @@ export default function ConsumosPage() {
           </button>
         </div>
 
-        {/* LISTA */}
         <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-4 space-y-4">
-
-          {/* Buscador */}
           <div className="relative">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
             <input
@@ -264,7 +250,6 @@ export default function ConsumosPage() {
             />
           </div>
 
-          {/* Acciones — fila con botones iguales */}
           <div className="flex gap-2">
             <button
               onClick={copiarTodo}
@@ -274,7 +259,6 @@ export default function ConsumosPage() {
               <Copy size={15} />
               Copiar lista
             </button>
-
             {userRole === 'admin' && (
               <button
                 onClick={limpiarLista}
@@ -287,18 +271,11 @@ export default function ConsumosPage() {
             )}
           </div>
 
-          {/* Items */}
           <div className="space-y-2">
             <AnimatePresence initial={false}>
               {filtrados.length === 0 ? (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-zinc-600 text-center py-10"
-                >
-                  {searchQuery
-                    ? 'Sin resultados para esa búsqueda.'
-                    : 'Todavía no hay consumos registrados.'}
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-zinc-600 text-center py-10">
+                  {searchQuery ? 'Sin resultados para esa búsqueda.' : 'Todavía no hay consumos registrados.'}
                 </motion.p>
               ) : (
                 filtrados.map((c, i) => (
@@ -311,15 +288,10 @@ export default function ConsumosPage() {
                     className="flex items-center justify-between gap-3 px-4 py-4 rounded-xl border border-zinc-800 bg-zinc-900/40 active:bg-zinc-900 transition"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      {/* Dot color */}
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                        c.tipo === 'free' ? 'bg-amber-400' : 'bg-blue-400'
-                      }`} />
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${c.tipo === 'free' ? 'bg-amber-400' : 'bg-blue-400'}`} />
                       <span className="text-sm text-zinc-100 truncate">{c.nombre}</span>
                       <TipoBadge tipo={c.tipo} />
                     </div>
-
-                    {/* Botón eliminar más grande para touch */}
                     {(userRole === 'admin' || c.user_id === userIdActual) && (
                       <button
                         onClick={() => eliminarConsumo(c.id, c.user_id)}

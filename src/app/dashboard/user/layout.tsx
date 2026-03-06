@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 import Link from 'next/link'
+import { PushBanner } from '@/components/PushBanner'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -341,11 +342,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <Tooltip key={item.href} label={item.label} enabled={sidebarCollapsed}>
                         <Link
                           href={item.href}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition w-full ${
-                            active
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition w-full ${active
                               ? 'bg-zinc-800 text-white'
                               : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                          }`}
+                            }`}
                         >
                           <Icon size={18} className="shrink-0" />
                           {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
@@ -361,6 +361,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* ===== CONTENT ===== */}
         {/* pb-24 en mobile para que no tape la bottom nav */}
         <main className="flex-1 p-4 pb-28 md:pb-8 md:p-6 lg:p-8 overflow-y-auto min-w-0">
+          <PushBanner />
           {children}
         </main>
       </div>
@@ -376,9 +377,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${
-                  active ? 'text-white' : 'text-zinc-500 active:text-zinc-300'
-                }`}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${active ? 'text-white' : 'text-zinc-500 active:text-zinc-300'
+                  }`}
               >
                 <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
                 <span className={`text-[10px] font-medium ${active ? 'text-white' : 'text-zinc-500'}`}>
@@ -397,11 +397,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Botón "Más" */}
           <button
             onClick={() => setMoreOpen(true)}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${
-              secondaryNavItems.some(i => i.href === pathname)
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${secondaryNavItems.some(i => i.href === pathname)
                 ? 'text-white'
                 : 'text-zinc-500 active:text-zinc-300'
-            }`}
+              }`}
           >
             <MoreHorizontal size={22} strokeWidth={1.8} />
             <span className="text-[10px] font-medium">Más</span>
@@ -447,11 +446,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       key={item.href}
                       href={item.href}
                       onClick={() => setMoreOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition ${
-                        active
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition ${active
                           ? 'bg-zinc-800 text-white'
                           : 'text-zinc-300 active:bg-zinc-800'
-                      }`}
+                        }`}
                     >
                       <Icon size={20} />
                       {item.label}

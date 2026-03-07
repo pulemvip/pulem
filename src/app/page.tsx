@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import { motion } from 'framer-motion'
+import { Sparkles } from 'lucide-react'
 
 type HomeEvent = {
   id: string
@@ -18,10 +20,9 @@ type HomeEvent = {
   fecha_evento: string | null
 }
 
-/* ===== SKELETON CARD ===== */
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl overflow-hidden bg-zinc-900 animate-pulse">
+    <div className="rounded-2xl overflow-hidden bg-zinc-950 animate-pulse">
       <div className="w-full h-80 sm:h-80 md:h-96 bg-zinc-800" />
       <div className="p-4 sm:p-5 space-y-3">
         <div className="h-5 bg-zinc-800 rounded-lg w-2/3" />
@@ -31,34 +32,86 @@ function SkeletonCard() {
   )
 }
 
+function isEventoPasado(fecha?: string | null): boolean {
+  if (!fecha) return false
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const fechaEvento = new Date(fecha)
+  fechaEvento.setHours(0, 0, 0, 0)
+  return fechaEvento < hoy
+}
+
+/* ===== PANTALLA MANTENIMIENTO HOME ===== */
+function MantenimientoHome({ mensaje }: { mensaje: string }) {
+  return (
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-6 text-center relative overflow-hidden">
+      {/* Fondo sutil */}
+      <div className="absolute inset-0 bg-gradient-to-br from-zinc-950 via-black to-zinc-950" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 space-y-8 max-w-md"
+      >
+        <Image src="/logo.png" alt="Logo" width={140} height={50} className="mx-auto drop-shadow-lg" />
+
+        <div className="space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
+            <Sparkles size={28} className="text-white/60" />
+          </div>
+          <p className="text-zinc-300 text-lg leading-relaxed">{mensaje}</p>
+        </div>
+
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-white/30 animate-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-white/30 animate-pulse [animation-delay:0.2s]" />
+          <div className="w-1.5 h-1.5 rounded-full bg-white/30 animate-pulse [animation-delay:0.4s]" />
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [events, setEvents] = useState<HomeEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const logoSrc = '/logo.png'
+  const [mantenimientoHome, setMantenimientoHome] = useState(false)
+  const [mensajeMantenimiento, setMensajeMantenimiento] = useState('Estamos preparando algo increíble. ¡Volvé pronto!')
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      const { data, error } = await supabase
-        .from('home_content')
-        .select('*')
-        .eq('activo', true)
-        .order('orden', { ascending: true })
+    const fetchAll = async () => {
+      const [{ data: configData }, { data: eventsData, error }] = await Promise.all([
+        supabase.from('configuracion').select('mantenimiento_home, mensaje_mantenimiento_home').eq('id', 'global').single(),
+        supabase.from('home_content').select('*').eq('activo', true).order('orden', { ascending: true }),
+      ])
+
+      if (configData?.mantenimiento_home) {
+        setMantenimientoHome(true)
+        setMensajeMantenimiento(configData.mensaje_mantenimiento_home)
+      }
 
       setTimeout(() => {
-        if (!error && data) setEvents(data)
+        if (!error && eventsData) setEvents(eventsData)
         setLoading(false)
-      }, 1000)
+      }, 800)
     }
-
-    fetchEvents()
+    fetchAll()
   }, [])
 
   const formatDate = (fecha?: string | null) => {
     if (!fecha) return { dia: '--', mes: '--' }
     const d = new Date(fecha)
-    const mes = d.toLocaleDateString('es-AR', { month: 'short' }).toUpperCase()
-    const dia = d.getDate()
-    return { dia, mes }
+    return {
+      dia: d.getDate(),
+      mes: d.toLocaleDateString('es-AR', { month: 'short' }).toUpperCase(),
+    }
+  }
+
+  // Mostrar pantalla de mantenimiento si está activo
+  if (!loading && mantenimientoHome) {
+    return <MantenimientoHome mensaje={mensajeMantenimiento} />
   }
 
   const backgroundVideo = events[0]?.video_url
@@ -79,7 +132,7 @@ export default function Home() {
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-4 pt-1 pb-1">
-          <Image src={logoSrc} alt="Logo" width={140} height={50} className="drop-shadow-lg" />
+          <Image src="/logo.png" alt="Logo" width={140} height={50} className="drop-shadow-lg" />
           <Link
             href="/login"
             className="rounded-xl bg-sky-600 px-4 py-1.5 text-sm font-semibold hover:bg-sky-500 transition shadow-lg"
@@ -102,32 +155,40 @@ export default function Home() {
           ) : (
             events.map((event, idx) => {
               const { dia, mes } = formatDate(event.fecha_evento)
+              const pasado = isEventoPasado(event.fecha_evento)
               const marginClass = idx === 0 ? 'sm:mr-auto' : idx === 1 ? 'sm:ml-auto' : ''
 
-              return (
-                <a
-                  key={event.id}
-                  href={event.boton_link || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`group relative rounded-2xl overflow-hidden shadow-xl transition duration-300 hover:scale-[1.02] bg-zinc-900 ${marginClass}`}
-                >
+              const inner = (
+                <>
                   {event.flyer_url && (
                     <div className="relative w-full h-80 sm:h-80 md:h-96 overflow-hidden">
                       <img
                         src={event.flyer_url}
                         alt={event.titulo}
-                        className="w-full h-full object-cover transition duration-500 group-hover:scale-110"
+                        className={`w-full h-full object-cover transition duration-500 ${
+                          pasado ? 'grayscale brightness-50' : 'group-hover:scale-110'
+                        }`}
                       />
                     </div>
                   )}
 
-                  <div className="absolute top-4 right-4 bg-black border border-white/20 rounded-lg px-4 py-2 text-center z-20">
+                  {/* Cartel FINALIZADO — esquina a esquina tipo estampilla */}
+                  {pasado && (
+                    <div className="absolute inset-0 z-40 pointer-events-none overflow-hidden rounded-2xl">
+                      <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[38deg] w-[160%] py-4 text-center bg-black/85 border-y-2 border-white/20 backdrop-blur-[2px]">
+                        <span className="text-white font-black text-2xl sm:text-3xl tracking-[0.4em] uppercase drop-shadow-xl">
+                          Finalizado
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="absolute top-4 right-4 bg-black/80 border border-white/20 rounded-lg px-4 py-2 text-center z-20 backdrop-blur-sm">
                     <div className="text-2xl font-bold leading-none">{dia}</div>
-                    <div className="text-xs uppercase">{mes}</div>
+                    <div className="text-xs uppercase tracking-wide">{mes}</div>
                   </div>
 
-                  {event.boton_link && (
+                  {!pasado && event.boton_link && (
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-700/70 to-black/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 z-20">
                       <span className="text-3xl font-extrabold tracking-wide">
                         {event.boton_texto || 'COMPRAR'}
@@ -135,13 +196,36 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className="p-3 sm:p-5 space-y-2 relative z-30 bg-black/60 rounded-b-xl">
-                    <h2 className="text-lg font-bold uppercase">{event.titulo}</h2>
-                    <p className="text-sm text-zinc-100 flex items-center gap-2">
+                  <div className={`p-3 sm:p-5 space-y-1.5 relative z-30 rounded-b-xl ${pasado ? 'bg-zinc-950' : 'bg-zinc-950'}`}>
+                    <h2 className={`text-lg font-bold uppercase ${pasado ? 'text-zinc-500' : ''}`}>
+                      {event.titulo}
+                    </h2>
+                    <p className={`text-sm flex items-center gap-2 ${pasado ? 'text-zinc-600' : 'text-zinc-100'}`}>
                       <span>📍</span>
                       {event.descripcion}
                     </p>
+                    {pasado && <p className="text-xs text-zinc-700 pt-0.5">Este evento ya finalizó</p>}
                   </div>
+                </>
+              )
+
+              if (pasado) {
+                return (
+                  <div key={event.id} className={`group relative rounded-2xl shadow-xl bg-zinc-950 cursor-default overflow-hidden ${marginClass}`}>
+                    {inner}
+                  </div>
+                )
+              }
+
+              return (
+                <a
+                  key={event.id}
+                  href={event.boton_link || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group relative rounded-2xl overflow-hidden shadow-xl transition duration-300 hover:scale-[1.02] bg-zinc-950 ${marginClass}`}
+                >
+                  {inner}
                 </a>
               )
             })

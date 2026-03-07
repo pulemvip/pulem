@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Shield, CheckCheck, X, Loader2, AlertTriangle } from 'lucide-react'
+import { Shield, Globe, CheckCheck, X, Loader2, AlertTriangle } from 'lucide-react'
 import { registrarAccion } from '@/lib/historial'
 
 type Config = {
   mantenimiento: boolean
   mensaje_mantenimiento: string
+  mantenimiento_home: boolean
+  mensaje_mantenimiento_home: string
 }
 
 type Toast = { id: number; message: string; type: 'success' | 'error' }
@@ -39,15 +41,135 @@ function ToastContainer({ toasts }: { toasts: Toast[] }) {
   )
 }
 
+function Toggle({
+  active,
+  onChange,
+  colorActive = 'amber',
+}: {
+  active: boolean
+  onChange: (val: boolean) => void
+  colorActive?: 'amber' | 'red'
+}) {
+  const colors = {
+    amber: { bg: 'bg-amber-500/20 border-amber-500/30', dot: 'bg-amber-400' },
+    red: { bg: 'bg-red-500/20 border-red-500/30', dot: 'bg-red-400' },
+  }
+  const c = colors[colorActive]
+  return (
+    <button
+      onClick={() => onChange(!active)}
+      className={`w-12 h-6 rounded-full border transition-all flex items-center px-0.5 ${
+        active ? c.bg : 'bg-zinc-800 border-zinc-700'
+      }`}
+    >
+      <motion.div
+        animate={{ x: active ? 24 : 0 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className={`w-5 h-5 rounded-full ${active ? c.dot : 'bg-zinc-600'}`}
+      />
+    </button>
+  )
+}
+
+function MantenimientoCard({
+  icon: Icon,
+  iconColor,
+  title,
+  description,
+  active,
+  statusActive,
+  statusInactive,
+  mensajeLabel,
+  mensaje,
+  onToggle,
+  onMensajeChange,
+  onGuardar,
+  saving,
+  colorActive,
+}: {
+  icon: React.ElementType
+  iconColor: string
+  title: string
+  description: string
+  active: boolean
+  statusActive: string
+  statusInactive: string
+  mensajeLabel: string
+  mensaje: string
+  onToggle: (val: boolean) => void
+  onMensajeChange: (val: string) => void
+  onGuardar: () => void
+  saving: boolean
+  colorActive: 'amber' | 'red'
+}) {
+  const borderColor = colorActive === 'amber' ? 'border-amber-500/20' : 'border-red-500/20'
+  const bgColor = colorActive === 'amber' ? 'bg-amber-500/10' : 'bg-red-500/10'
+  const textColor = colorActive === 'amber' ? 'text-amber-400' : 'text-red-400'
+  const statusColor = active ? textColor : 'text-emerald-400'
+
+  return (
+    <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-5 space-y-5">
+      <div className="flex items-center gap-3 pb-4 border-b border-zinc-800">
+        <div className={`w-9 h-9 rounded-xl ${bgColor} border ${borderColor} flex items-center justify-center shrink-0`}>
+          <Icon size={16} className={textColor} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">{title}</p>
+          <p className="text-xs text-zinc-500">{description}</p>
+        </div>
+      </div>
+
+      {/* Toggle */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-zinc-300">Estado</p>
+          <p className={`text-xs mt-0.5 ${statusColor}`}>
+            {active ? statusActive : statusInactive}
+          </p>
+        </div>
+        <Toggle active={active} onChange={onToggle} colorActive={colorActive} />
+      </div>
+
+      {/* Mensaje */}
+      <div className="space-y-2">
+        <p className="text-xs text-zinc-500 uppercase tracking-wide">{mensajeLabel}</p>
+        <textarea
+          rows={3}
+          value={mensaje}
+          onChange={e => onMensajeChange(e.target.value)}
+          className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition resize-none"
+          placeholder="Mensaje..."
+        />
+      </div>
+
+      {/* Guardar */}
+      <button
+        onClick={onGuardar}
+        disabled={saving}
+        className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl text-sm font-bold active:bg-zinc-200 disabled:opacity-40 transition"
+      >
+        {saving
+          ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
+          : <><CheckCheck size={14} /> Guardar</>
+        }
+      </button>
+    </div>
+  )
+}
+
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Config>({
     mantenimiento: false,
     mensaje_mantenimiento: 'El sistema está en mantenimiento. Volvé más tarde.',
+    mantenimiento_home: false,
+    mensaje_mantenimiento_home: 'Estamos preparando algo increíble. ¡Volvé pronto!',
   })
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingDashboard, setSavingDashboard] = useState(false)
+  const [savingHome, setSavingHome] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [showConfirmDashboard, setShowConfirmDashboard] = useState(false)
+  const [showConfirmHome, setShowConfirmHome] = useState(false)
 
   const addToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now()
@@ -59,20 +181,18 @@ export default function ConfiguracionPage() {
     const fetchConfig = async () => {
       const { data } = await supabase
         .from('configuracion')
-        .select('mantenimiento, mensaje_mantenimiento')
+        .select('mantenimiento, mensaje_mantenimiento, mantenimiento_home, mensaje_mantenimiento_home')
         .eq('id', 'global')
         .single()
-
       if (data) setConfig(data)
       setLoading(false)
     }
     fetchConfig()
   }, [])
 
-  const guardar = async () => {
-    setSaving(true)
+  const guardarDashboard = async () => {
+    setSavingDashboard(true)
     const { data: { user } } = await supabase.auth.getUser()
-
     const { error } = await supabase
       .from('configuracion')
       .update({
@@ -84,23 +204,52 @@ export default function ConfiguracionPage() {
       .eq('id', 'global')
 
     if (error) {
-      addToast('Error al guardar configuración', 'error')
+      addToast('Error al guardar', 'error')
     } else {
       await registrarAccion({
         accion: config.mantenimiento ? 'usuario_desactivado' : 'usuario_activado',
-        detalle: config.mantenimiento
-          ? 'Modo mantenimiento activado'
-          : 'Modo mantenimiento desactivado',
+        detalle: config.mantenimiento ? 'Mantenimiento dashboard activado' : 'Mantenimiento dashboard desactivado',
       })
-      addToast('Configuración guardada', 'success')
+      addToast('Dashboard guardado', 'success')
     }
-    setSaving(false)
-    setShowConfirm(false)
+    setSavingDashboard(false)
+    setShowConfirmDashboard(false)
   }
 
-  const handleToggleMantenimiento = (value: boolean) => {
-    setConfig(prev => ({ ...prev, mantenimiento: value }))
-    if (value) setShowConfirm(true)
+  const guardarHome = async () => {
+    setSavingHome(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase
+      .from('configuracion')
+      .update({
+        mantenimiento_home: config.mantenimiento_home,
+        mensaje_mantenimiento_home: config.mensaje_mantenimiento_home,
+        updated_at: new Date().toISOString(),
+        updated_by: user?.email ?? null,
+      })
+      .eq('id', 'global')
+
+    if (error) {
+      addToast('Error al guardar', 'error')
+    } else {
+      await registrarAccion({
+        accion: config.mantenimiento_home ? 'usuario_desactivado' : 'usuario_activado',
+        detalle: config.mantenimiento_home ? 'Mantenimiento home activado' : 'Mantenimiento home desactivado',
+      })
+      addToast('Home guardada', 'success')
+    }
+    setSavingHome(false)
+    setShowConfirmHome(false)
+  }
+
+  const handleToggleDashboard = (val: boolean) => {
+    setConfig(prev => ({ ...prev, mantenimiento: val }))
+    if (val) setShowConfirmDashboard(true)
+  }
+
+  const handleToggleHome = (val: boolean) => {
+    setConfig(prev => ({ ...prev, mantenimiento_home: val }))
+    if (val) setShowConfirmHome(true)
   }
 
   if (loading) {
@@ -127,93 +276,76 @@ export default function ConfiguracionPage() {
           <p className="text-sm text-zinc-500 mt-0.5">Ajustes globales del sistema</p>
         </div>
 
-        {/* Banner mantenimiento activo */}
+        {/* Banners activos */}
         <AnimatePresence>
           {config.mantenimiento && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
               className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20"
             >
               <AlertTriangle size={16} className="text-amber-400 shrink-0" />
               <p className="text-sm text-amber-300">
-                El modo mantenimiento está <span className="font-semibold">activo</span>. Los vendedores no pueden acceder al dashboard.
+                Dashboard en <span className="font-semibold">mantenimiento</span> — vendedores sin acceso.
+              </p>
+            </motion.div>
+          )}
+          {config.mantenimiento_home && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-500/10 border border-red-500/20"
+            >
+              <AlertTriangle size={16} className="text-red-400 shrink-0" />
+              <p className="text-sm text-red-300">
+                Home pública en <span className="font-semibold">mantenimiento</span> — visible para todos.
               </p>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Modo mantenimiento */}
-        <div className="bg-[#0f0f14] border border-zinc-800 rounded-2xl p-5 space-y-5">
-          <div className="flex items-center gap-3 pb-4 border-b border-zinc-800">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <Shield size={16} className="text-amber-400" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-white">Modo mantenimiento</p>
-              <p className="text-xs text-zinc-500">Bloquea el acceso al dashboard para todos los vendedores</p>
-            </div>
-          </div>
+        {/* Card dashboard */}
+        <MantenimientoCard
+          icon={Shield}
+          iconColor="text-amber-400"
+          colorActive="amber"
+          title="Mantenimiento del Dashboard"
+          description="Bloquea el acceso al dashboard para todos los vendedores"
+          active={config.mantenimiento}
+          statusActive="Activo — acceso bloqueado"
+          statusInactive="Inactivo — sistema operativo"
+          mensajeLabel="Mensaje que verán los vendedores"
+          mensaje={config.mensaje_mantenimiento}
+          onToggle={handleToggleDashboard}
+          onMensajeChange={val => setConfig(prev => ({ ...prev, mensaje_mantenimiento: val }))}
+          onGuardar={guardarDashboard}
+          saving={savingDashboard}
+        />
 
-          {/* Toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-zinc-300">Estado</p>
-              <p className={`text-xs mt-0.5 ${config.mantenimiento ? 'text-amber-400' : 'text-emerald-400'}`}>
-                {config.mantenimiento ? 'Activo — acceso bloqueado' : 'Inactivo — sistema operativo'}
-              </p>
-            </div>
-            <button
-              onClick={() => handleToggleMantenimiento(!config.mantenimiento)}
-              className={`w-12 h-6 rounded-full border transition-all flex items-center px-0.5 ${
-                config.mantenimiento
-                  ? 'bg-amber-500/20 border-amber-500/30'
-                  : 'bg-zinc-800 border-zinc-700'
-              }`}
-            >
-              <motion.div
-                animate={{ x: config.mantenimiento ? 24 : 0 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                className={`w-5 h-5 rounded-full ${config.mantenimiento ? 'bg-amber-400' : 'bg-zinc-600'}`}
-              />
-            </button>
-          </div>
-
-          {/* Mensaje de mantenimiento */}
-          <div className="space-y-2">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide">Mensaje que verán los vendedores</p>
-            <textarea
-              rows={3}
-              value={config.mensaje_mantenimiento}
-              onChange={e => setConfig(prev => ({ ...prev, mensaje_mantenimiento: e.target.value }))}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition resize-none"
-              placeholder="Mensaje para los vendedores..."
-            />
-          </div>
-
-          {/* Guardar */}
-          <button
-            onClick={guardar}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl text-sm font-bold active:bg-zinc-200 disabled:opacity-40 transition"
-          >
-            {saving
-              ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
-              : <><CheckCheck size={14} /> Guardar configuración</>
-            }
-          </button>
-        </div>
+        {/* Card home */}
+        <MantenimientoCard
+          icon={Globe}
+          iconColor="text-red-400"
+          colorActive="red"
+          title="Mantenimiento de la Home"
+          description="Reemplaza la home pública con una pantalla de pausa"
+          active={config.mantenimiento_home}
+          statusActive="Activo — home bloqueada"
+          statusInactive="Inactivo — home visible"
+          mensajeLabel="Mensaje que verán los visitantes"
+          mensaje={config.mensaje_mantenimiento_home}
+          onToggle={handleToggleHome}
+          onMensajeChange={val => setConfig(prev => ({ ...prev, mensaje_mantenimiento_home: val }))}
+          onGuardar={guardarHome}
+          saving={savingHome}
+        />
       </motion.div>
 
-      {/* Modal confirmación activar mantenimiento */}
+      {/* Modal confirmación dashboard */}
       <AnimatePresence>
-        {showConfirm && (
+        {showConfirmDashboard && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/60 z-[70]"
-              onClick={() => { setShowConfirm(false); setConfig(prev => ({ ...prev, mantenimiento: false })) }}
+              onClick={() => { setShowConfirmDashboard(false); setConfig(prev => ({ ...prev, mantenimiento: false })) }}
             />
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -224,26 +356,51 @@ export default function ConfiguracionPage() {
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
                   <AlertTriangle size={18} className="text-amber-400" />
                 </div>
-                <h2 className="text-base font-semibold mb-2">¿Activar mantenimiento?</h2>
-                <p className="text-sm text-zinc-400 mb-6">
-                  Todos los vendedores verán el mensaje de mantenimiento y no podrán usar el dashboard hasta que lo desactives.
-                </p>
+                <h2 className="text-base font-semibold mb-2">¿Activar mantenimiento del dashboard?</h2>
+                <p className="text-sm text-zinc-400 mb-6">Los vendedores no podrán acceder hasta que lo desactives.</p>
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowConfirm(false)
-                      setConfig(prev => ({ ...prev, mantenimiento: false }))
-                    }}
-                    className="flex-1 py-3.5 text-sm rounded-2xl border border-zinc-700 text-zinc-300 active:bg-zinc-800 transition"
-                  >
+                  <button onClick={() => { setShowConfirmDashboard(false); setConfig(prev => ({ ...prev, mantenimiento: false })) }}
+                    className="flex-1 py-3.5 text-sm rounded-2xl border border-zinc-700 text-zinc-300 active:bg-zinc-800 transition">
                     Cancelar
                   </button>
-                  <button
-                    onClick={guardar}
-                    disabled={saving}
-                    className="flex-1 py-3.5 text-sm rounded-2xl bg-amber-600 text-white font-semibold active:bg-amber-700 disabled:opacity-40 transition"
-                  >
-                    {saving ? 'Guardando...' : 'Activar'}
+                  <button onClick={guardarDashboard} disabled={savingDashboard}
+                    className="flex-1 py-3.5 text-sm rounded-2xl bg-amber-600 text-white font-semibold active:bg-amber-700 disabled:opacity-40 transition">
+                    {savingDashboard ? 'Guardando...' : 'Activar'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Modal confirmación home */}
+      <AnimatePresence>
+        {showConfirmHome && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[70]"
+              onClick={() => { setShowConfirmHome(false); setConfig(prev => ({ ...prev, mantenimiento_home: false })) }}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }} transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex items-end sm:items-center justify-center z-[80] px-4 pb-6 sm:pb-0"
+            >
+              <div className="bg-[#111118] border border-zinc-800 rounded-3xl p-6 w-full max-w-sm shadow-xl">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                  <Globe size={18} className="text-red-400" />
+                </div>
+                <h2 className="text-base font-semibold mb-2">¿Activar mantenimiento de la home?</h2>
+                <p className="text-sm text-zinc-400 mb-6">Todos los visitantes verán la pantalla de pausa en lugar de los eventos.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowConfirmHome(false); setConfig(prev => ({ ...prev, mantenimiento_home: false })) }}
+                    className="flex-1 py-3.5 text-sm rounded-2xl border border-zinc-700 text-zinc-300 active:bg-zinc-800 transition">
+                    Cancelar
+                  </button>
+                  <button onClick={guardarHome} disabled={savingHome}
+                    className="flex-1 py-3.5 text-sm rounded-2xl bg-red-600 text-white font-semibold active:bg-red-700 disabled:opacity-40 transition">
+                    {savingHome ? 'Guardando...' : 'Activar'}
                   </button>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -21,7 +21,9 @@ function getInitials(email: string): string {
   return name.slice(0, 2).toUpperCase()
 }
 
-function AvatarCircle({ email, avatarUrl, size = 'sm' }: { email: string; avatarUrl: string | null; size?: 'sm' | 'md' }) {
+function AvatarCircle({
+  email, avatarUrl, size = 'sm',
+}: { email: string; avatarUrl: string | null; size?: 'sm' | 'md' }) {
   const dim = size === 'sm' ? 'w-9 h-9 text-xs' : 'w-11 h-11 text-sm'
   if (avatarUrl) {
     return (
@@ -102,16 +104,10 @@ function AvatarDropdown({ email, avatarUrl, onLogout }: { email: string; avatarU
   )
 }
 
-/* ===== PANTALLA MANTENIMIENTO ===== */
 function MantenimientoScreen({ mensaje, onLogout }: { mensaje: string; onLogout: () => void }) {
   return (
     <div className="min-h-screen bg-[#0c0c0f] flex flex-col items-center justify-center px-6 text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="space-y-6 max-w-sm"
-      >
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6 max-w-sm">
         <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
           <Wrench size={28} className="text-amber-400" />
         </div>
@@ -119,10 +115,7 @@ function MantenimientoScreen({ mensaje, onLogout }: { mensaje: string; onLogout:
           <h1 className="text-xl font-bold text-white mb-2">Sistema en mantenimiento</h1>
           <p className="text-sm text-zinc-400 leading-relaxed">{mensaje}</p>
         </div>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl border border-zinc-700 text-sm text-zinc-400 hover:bg-zinc-800 transition"
-        >
+        <button onClick={onLogout} className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl border border-zinc-700 text-sm text-zinc-400 hover:bg-zinc-800 transition">
           <LogOut size={14} /> Cerrar sesión
         </button>
       </motion.div>
@@ -135,75 +128,95 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
 
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<string>('cliente')
+  const [userRole, setUserRole] = useState<string>('vendedor')
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [mantenimiento, setMantenimiento] = useState(false)
   const [mensajeMantenimiento, setMensajeMantenimiento] = useState('El sistema está en mantenimiento. Volvé más tarde.')
-  const [loadingAuth, setLoadingAuth] = useState(true)
+
+  // Separamos loading de auth vs loading de datos secundarios
+  // así la navegación no espera a que cargue todo
+  const [authReady, setAuthReady] = useState(false)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
-
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
     crm: true, marketing: true, admin: true,
   })
 
+  // Leer localStorage sin bloquear render
   useEffect(() => {
     const collapsed = localStorage.getItem('sidebarCollapsed')
     const categories = localStorage.getItem('openCategories')
     if (collapsed) setSidebarCollapsed(collapsed === 'true')
-    if (categories) setOpenCategories(JSON.parse(categories))
+    if (categories) { try { setOpenCategories(JSON.parse(categories)) } catch {} }
   }, [])
 
   useEffect(() => { localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed)) }, [sidebarCollapsed])
   useEffect(() => { localStorage.setItem('openCategories', JSON.stringify(openCategories)) }, [openCategories])
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (!data.user) { router.push('/login'); return }
-      setUserEmail(data.user.email ?? null)
+    let cancelled = false
 
+    const init = async () => {
+      // 1. Auth primero — lo más rápido posible
+      const { data: authData } = await supabase.auth.getUser()
+      if (cancelled) return
+
+      if (!authData.user) {
+        router.replace('/login')
+        return
+      }
+
+      setUserEmail(authData.user.email ?? null)
+      // Marcamos auth lista YA — el layout se muestra y la nav funciona
+      setAuthReady(true)
+
+      // 2. Perfil + config en paralelo — no bloquean la navegación
       const [perfilRes, configRes] = await Promise.all([
-        supabase.from('usuarios').select('rol, avatar_url').eq('id', data.user.id).single(),
+        supabase.from('usuarios').select('rol, avatar_url').eq('id', authData.user.id).single(),
         supabase.from('configuracion').select('mantenimiento, mensaje_mantenimiento').eq('id', 'global').single(),
       ])
+
+      if (cancelled) return
 
       if (perfilRes.data?.rol) setUserRole(perfilRes.data.rol)
       if (perfilRes.data?.avatar_url) setAvatarUrl(perfilRes.data.avatar_url)
 
-      // Solo bloquear a no-admins
       if (configRes.data?.mantenimiento && perfilRes.data?.rol !== 'admin') {
         setMantenimiento(true)
         setMensajeMantenimiento(configRes.data.mensaje_mantenimiento)
       }
-
-      setLoadingAuth(false)
     }
-    getUser()
+
+    init()
+    return () => { cancelled = true }
   }, [router])
 
+  // Refrescar avatar al cambiar de página (sin bloquear)
   useEffect(() => {
+    let cancelled = false
     const refreshAvatar = async () => {
       const { data } = await supabase.auth.getUser()
-      if (!data.user) return
+      if (!data.user || cancelled) return
       const { data: perfil } = await supabase.from('usuarios').select('avatar_url').eq('id', data.user.id).single()
-      if (perfil?.avatar_url) setAvatarUrl(perfil.avatar_url)
+      if (!cancelled && perfil?.avatar_url) setAvatarUrl(perfil.avatar_url)
     }
     refreshAvatar()
+    return () => { cancelled = true }
   }, [pathname])
 
-  const cerrarSesion = async () => {
+  const cerrarSesion = useCallback(async () => {
     await supabase.auth.signOut()
-    router.push('/login')
-  }
+    router.replace('/login')
+  }, [router])
 
-  const toggleCategory = (key: string) => {
+  const toggleCategory = useCallback((key: string) => {
     setOpenCategories(prev => ({ ...prev, [key]: !prev[key] }))
-  }
+  }, [])
 
-  if (loadingAuth) {
+  // Solo spinner si no tenemos auth todavía
+  if (!authReady) {
     return (
       <div className="min-h-screen bg-[#0c0c0f] flex items-center justify-center">
         <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-300 animate-spin" />
@@ -211,7 +224,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  // Mostrar pantalla de mantenimiento si corresponde
   if (mantenimiento) {
     return <MantenimientoScreen mensaje={mensajeMantenimiento} onLogout={cerrarSesion} />
   }
@@ -257,7 +269,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-50 bg-[#0c0c0f]/90 backdrop-blur-md border-b border-zinc-800">
         <div className="px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg hover:bg-zinc-800 transition">
+            <button onClick={() => setSidebarCollapsed(p => !p)} className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg hover:bg-zinc-800 transition">
               {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
             </button>
             <Image src="/logo.png" alt="VIP" width={60} height={60} className="h-9 w-auto" />
@@ -314,26 +326,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </div>
 
+      {/* Bottom nav mobile */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f14]/95 backdrop-blur-md border-t border-zinc-800">
-        <div className="flex items-center justify-around px-2 py-2 safe-area-pb">
+        <div className="flex items-center justify-around px-2 py-2">
           {mainNavItems.map(item => {
             const active = pathname === item.href
             const Icon = item.icon
             return (
-              <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${active ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}>
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch={true}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${active ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}
+              >
                 <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
                 <span className={`text-[10px] font-medium ${active ? 'text-white' : 'text-zinc-500'}`}>{item.label}</span>
-                {active && <motion.div layoutId="bottomNavIndicator" className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </Link>
             )
           })}
-          <button onClick={() => setMoreOpen(true)} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${secondaryNavItems.some(i => i.href === pathname) ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}>
+          <button
+            onClick={() => setMoreOpen(true)}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${secondaryNavItems.some(i => i.href === pathname) ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}
+          >
             <MoreHorizontal size={22} strokeWidth={1.8} />
             <span className="text-[10px] font-medium">Más</span>
           </button>
         </div>
       </nav>
 
+      {/* Sheet "Más" */}
       <AnimatePresence>
         {moreOpen && (
           <>
@@ -358,7 +379,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   const active = pathname === item.href
                   const Icon = item.icon
                   return (
-                    <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition ${active ? 'bg-zinc-800 text-white' : 'text-zinc-300 active:bg-zinc-800'}`}>
+                    <Link key={item.href} href={item.href} prefetch={true} onClick={() => setMoreOpen(false)} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition ${active ? 'bg-zinc-800 text-white' : 'text-zinc-300 active:bg-zinc-800'}`}>
                       <Icon size={20} />
                       {item.label}
                     </Link>
@@ -374,6 +395,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         )}
       </AnimatePresence>
 
+      {/* Modal logout */}
       <AnimatePresence>
         {showLogoutModal && (
           <>

@@ -142,10 +142,15 @@ export default function ConsumosPage() {
     }
   }
 
+  const [showConfirmLimpiar, setShowConfirmLimpiar] = useState(false)
+  const [limpiando, setLimpiando] = useState(false)
+
   const limpiarLista = async () => {
     if (userRole !== 'admin') return
+    setLimpiando(true)
     const total = consumos.length
-    const { error } = await supabase.from('consumos').delete().neq('id', '')
+    const ids = consumos.map(c => c.id)
+    const { error } = await supabase.from('consumos').delete().in('id', ids)
     if (error) {
       addToast('Error al limpiar', 'error')
     } else {
@@ -157,6 +162,8 @@ export default function ConsumosPage() {
       setConsumos([])
       addToast('Lista limpiada', 'success')
     }
+    setLimpiando(false)
+    setShowConfirmLimpiar(false)
   }
 
   const copiarTodo = async () => {
@@ -261,7 +268,7 @@ export default function ConsumosPage() {
             </button>
             {userRole === 'admin' && (
               <button
-                onClick={limpiarLista}
+                onClick={() => setShowConfirmLimpiar(true)}
                 disabled={consumos.length === 0}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/30 text-sm text-red-400 active:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
@@ -313,6 +320,47 @@ export default function ConsumosPage() {
           )}
         </div>
       </motion.div>
+      {/* Modal confirmar limpiar */}
+      <AnimatePresence>
+        {showConfirmLimpiar && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[70]"
+              onClick={() => !limpiando && setShowConfirmLimpiar(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }} transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex items-end sm:items-center justify-center z-[80] px-4 pb-6 sm:pb-0"
+            >
+              <div className="bg-[#111118] border border-zinc-800 rounded-3xl p-6 w-full max-w-sm shadow-xl">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                  <Trash2 size={18} className="text-red-400" />
+                </div>
+                <h2 className="text-base font-semibold mb-2">¿Limpiar toda la lista?</h2>
+                <p className="text-sm text-zinc-400 mb-1">Se van a eliminar <span className="text-white font-semibold">{consumos.length} consumos</span>.</p>
+                <p className="text-sm text-zinc-500 mb-6">Esta acción no se puede deshacer.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowConfirmLimpiar(false)}
+                    disabled={limpiando}
+                    className="flex-1 py-3.5 text-sm rounded-2xl border border-zinc-700 text-zinc-300 active:bg-zinc-800 disabled:opacity-40 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={limpiarLista}
+                    disabled={limpiando}
+                    className="flex-1 py-3.5 text-sm rounded-2xl bg-red-600 text-white font-semibold active:bg-red-700 disabled:opacity-40 transition flex items-center justify-center gap-2"
+                  >
+                    {limpiando ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Limpiando...</> : 'Limpiar todo'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   )
 }

@@ -1,7 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Plus, Save, Trash2, Image as ImageIcon, Video,
+  Calendar, Link as LinkIcon, Type, AlignLeft,
+  CheckCheck, X, Loader2, AlertTriangle,
+} from 'lucide-react'
 
 type HomeContent = {
   id: string
@@ -11,275 +17,397 @@ type HomeContent = {
   video_url: string
   boton_texto: string | null
   boton_link: string | null
-  fecha_evento: string | null // NUEVO CAMPO
+  fecha_evento: string | null
 }
 
-export default function HomePage() {
-  const [homes, setHomes] = useState<HomeContent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [savingId, setSavingId] = useState<string | null>(null)
+type Toast = { id: number; message: string; type: 'success' | 'error' }
 
-  useEffect(() => {
-    const cargarHomes = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        window.location.href = '/login'
-        return
-      }
+function ToastContainer({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:w-auto z-[100] flex flex-col gap-2 items-stretch sm:items-end pointer-events-none">
+      <AnimatePresence>
+        {toasts.map(t => (
+          <motion.div key={t.id}
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl border shadow-xl text-sm font-medium ${
+              t.type === 'success'
+                ? 'bg-[#0f0f14] border-emerald-500/30 text-emerald-400'
+                : 'bg-[#0f0f14] border-red-500/30 text-red-400'
+            }`}
+          >
+            {t.type === 'success' ? <CheckCheck size={15} /> : <X size={15} />}
+            {t.message}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
 
-      const { data } = await supabase
-        .from('home_content')
-        .select('*')
-        .order('updated_at', { ascending: true })
+function Field({ label, icon: Icon, children }: { label: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2 text-xs text-zinc-500 uppercase tracking-wide">
+        <Icon size={12} />
+        {label}
+      </div>
+      {children}
+    </div>
+  )
+}
 
-      setHomes(data || [])
-      setLoading(false)
-    }
+function EventCard({
+  home, index, onUpdate, onSave, onDelete, saving,
+}: {
+  home: HomeContent
+  index: number
+  onUpdate: (id: string, campo: keyof HomeContent, valor: string | null) => void
+  onSave: (home: HomeContent, index: number) => void
+  onDelete: (id: string) => void
+  saving: boolean
+}) {
+  const flyerRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLInputElement>(null)
+  const [uploadingFlyer, setUploadingFlyer] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-    cargarHomes()
-  }, [])
-
-  const actualizarCampo = (
-    id: string,
-    campo: keyof HomeContent,
-    valor: any
-  ) => {
-    setHomes(prev =>
-      prev.map(h =>
-        h.id === id ? { ...h, [campo]: valor } : h
-      )
-    )
-  }
-
-  const guardarHome = async (home: HomeContent, index: number) => {
-    setSavingId(home.id)
-
-    const { error } = await supabase
-      .from('home_content')
-      .update({
-        titulo: home.titulo,
-        descripcion: home.descripcion,
-        flyer_url: home.flyer_url,
-        video_url: index === 0 ? home.video_url : '', // solo el primero guarda video
-        boton_texto: home.boton_texto || null,
-        boton_link: home.boton_link || null,
-        fecha_evento: home.fecha_evento || null, // <-- AGREGADO
-      })
-      .eq('id', home.id)
-
-    setSavingId(null)
-
-    if (error) {
-      alert(error.message)
-    } else {
-      alert('Evento actualizado correctamente')
-    }
-  }
-
-  const crearEvento = async () => {
-    if (homes.length >= 2) {
-      alert('Solo podés tener máximo 2 eventos')
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('home_content')
-      .insert({
-        titulo: 'Nuevo Evento',
-        descripcion: 'Descripción del evento',
-        flyer_url: 'https://placehold.co/600x800',
-        boton_texto: null,
-        boton_link: null,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error(error)
-      alert(error.message)
-      return
-    }
-
-    setHomes(prev => [...prev, data])
-  }
-
-  const eliminarEvento = async (id: string) => {
-    if (!confirm('¿Eliminar este evento?')) return
-
-    const { error } = await supabase
-      .from('home_content')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      setHomes(prev => prev.filter(h => h.id !== id))
-    }
-  }
-
-  const subirArchivoHome = async (
-    id: string,
-    file: File,
-    tipo: 'flyer' | 'video'
-  ) => {
+  const subirArchivo = async (file: File, tipo: 'flyer' | 'video') => {
+    const setUploading = tipo === 'flyer' ? setUploadingFlyer : setUploadingVideo
+    setUploading(true)
     const ext = file.name.split('.').pop()
-    const path = `${id}-${tipo}.${ext}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('home-assets')
-      .upload(path, file, { upsert: true })
-
-    if (uploadError) {
-      alert('Error al subir el archivo')
-      return
+    const path = `${home.id}-${tipo}.${ext}`
+    const { error } = await supabase.storage.from('home-assets').upload(path, file, { upsert: true })
+    if (error) {
+      setUploading(false)
+      return null
     }
-
-    const { data } = supabase.storage
-      .from('home-assets')
-      .getPublicUrl(path)
-
-    actualizarCampo(
-      id,
-      tipo === 'flyer' ? 'flyer_url' : 'video_url',
-      data.publicUrl
-    )
-  }
-
-  if (loading) {
-    return <div className="text-zinc-400">Cargando...</div>
+    const { data } = supabase.storage.from('home-assets').getPublicUrl(path)
+    onUpdate(home.id, tipo === 'flyer' ? 'flyer_url' : 'video_url', `${data.publicUrl}?t=${Date.now()}`)
+    setUploading(false)
   }
 
   return (
-    <div className="space-y-10">
-
-      {homes.map((home, index) => (
-        <div
-          key={home.id}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-4"
-        >
-          <h2 className="font-semibold text-lg">
-            🏠 Evento {index + 1}
-          </h2>
-
-          {/* TÍTULO */}
-          <input
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-            value={home.titulo}
-            onChange={e =>
-              actualizarCampo(home.id, 'titulo', e.target.value)
-            }
-            placeholder="Título"
-          />
-
-          {/* DESCRIPCIÓN */}
-          <textarea
-            rows={3}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-            value={home.descripcion}
-            onChange={e =>
-              actualizarCampo(home.id, 'descripcion', e.target.value)
-            }
-            placeholder="Descripción"
-          />
-
-          {/* FECHA DEL EVENTO */}
-          <input
-            type="date"
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-            value={home.fecha_evento ?? ''}
-            onChange={e =>
-              actualizarCampo(home.id, 'fecha_evento', e.target.value)
-            }
-            placeholder="Fecha del evento"
-          />
-
-          {/* TEXTO BOTÓN */}
-          <input
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-            value={home.boton_texto ?? ''}
-            onChange={e =>
-              actualizarCampo(home.id, 'boton_texto', e.target.value)
-            }
-            placeholder="Texto del botón"
-          />
-
-          {/* LINK BOTÓN */}
-          <input
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-zinc-100"
-            value={home.boton_link ?? ''}
-            onChange={e =>
-              actualizarCampo(home.id, 'boton_link', e.target.value)
-            }
-            placeholder="Link del botón (https://...)"
-          />
-
-          {/* FLYER */}
-          <div className="space-y-2">
-            <div className="text-sm text-zinc-400">Flyer</div>
-            {home.flyer_url && (
-              <img
-                src={home.flyer_url}
-                className="max-h-64 w-full object-contain rounded-lg"
-              />
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={e =>
-                e.target.files &&
-                subirArchivoHome(home.id, e.target.files[0], 'flyer')
-              }
-            />
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.08 }}
+        className="bg-[#0f0f14] border border-zinc-800 rounded-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-zinc-800 flex items-center justify-center text-sm font-bold text-zinc-300">
+              {index + 1}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white truncate max-w-[180px]">
+                {home.titulo || 'Sin título'}
+              </p>
+              <p className="text-xs text-zinc-600">Evento {index + 1}</p>
+            </div>
           </div>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
 
-          {/* VIDEO SOLO PARA EL PRIMER EVENTO */}
-          {index === 0 && (
-            <div className="space-y-2">
-              <div className="text-sm text-zinc-400">Video</div>
-              {home.video_url && (
-                <video
-                  src={home.video_url}
-                  controls
-                  className="max-h-64 w-full object-contain rounded-lg"
-                />
-              )}
-              <input
-                type="file"
-                accept="video/*"
-                onChange={e =>
-                  e.target.files &&
-                  subirArchivoHome(home.id, e.target.files[0], 'video')
-                }
-              />
+        <div className="p-5 space-y-4">
+          {/* Flyer preview */}
+          {home.flyer_url && (
+            <div className="relative w-full h-48 rounded-xl overflow-hidden border border-zinc-800">
+              <img src={home.flyer_url} alt="Flyer" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+              <button
+                onClick={() => flyerRef.current?.click()}
+                className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 border border-white/20 text-xs text-white backdrop-blur-sm hover:bg-black/80 transition"
+              >
+                {uploadingFlyer ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                {uploadingFlyer ? 'Subiendo...' : 'Cambiar flyer'}
+              </button>
             </div>
           )}
 
-          <div className="flex gap-3">
+          {!home.flyer_url && (
             <button
-              onClick={() => guardarHome(home, index)}
-              disabled={savingId === home.id}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg"
+              onClick={() => flyerRef.current?.click()}
+              className="w-full h-32 rounded-xl border-2 border-dashed border-zinc-700 flex flex-col items-center justify-center gap-2 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400 transition"
             >
-              {savingId === home.id ? 'Guardando...' : 'Guardar cambios'}
+              {uploadingFlyer ? <Loader2 size={20} className="animate-spin" /> : <ImageIcon size={20} />}
+              <span className="text-sm">{uploadingFlyer ? 'Subiendo...' : 'Subir flyer'}</span>
             </button>
+          )}
 
-            <button
-              onClick={() => eliminarEvento(home.id)}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg"
+          <input ref={flyerRef} type="file" accept="image/*" className="hidden"
+            onChange={e => e.target.files && subirArchivo(e.target.files[0], 'flyer')} />
+
+          {/* Campos */}
+          <Field label="Título" icon={Type}>
+            <input
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
+              value={home.titulo}
+              onChange={e => onUpdate(home.id, 'titulo', e.target.value)}
+              placeholder="Nombre del evento"
+            />
+          </Field>
+
+          <Field label="Descripción / Lugar" icon={AlignLeft}>
+            <textarea
+              rows={2}
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition resize-none"
+              value={home.descripcion}
+              onChange={e => onUpdate(home.id, 'descripcion', e.target.value)}
+              placeholder="Dirección o descripción corta"
+            />
+          </Field>
+
+          <Field label="Fecha del evento" icon={Calendar}>
+            <input
+              type="date"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition [color-scheme:dark]"
+              value={home.fecha_evento ?? ''}
+              onChange={e => onUpdate(home.id, 'fecha_evento', e.target.value || null)}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Texto del botón" icon={Type}>
+              <input
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
+                value={home.boton_texto ?? ''}
+                onChange={e => onUpdate(home.id, 'boton_texto', e.target.value || null)}
+                placeholder="COMPRAR"
+              />
+            </Field>
+            <Field label="Link del botón" icon={LinkIcon}>
+              <input
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 transition"
+                value={home.boton_link ?? ''}
+                onChange={e => onUpdate(home.id, 'boton_link', e.target.value || null)}
+                placeholder="https://..."
+              />
+            </Field>
+          </div>
+
+          {/* Video — solo primer evento */}
+          {index === 0 && (
+            <Field label="Video de fondo" icon={Video}>
+              <div className="space-y-2">
+                {home.video_url && (
+                  <video src={home.video_url} controls className="w-full h-32 rounded-xl object-cover border border-zinc-800" />
+                )}
+                <button
+                  onClick={() => videoRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-zinc-700 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition"
+                >
+                  {uploadingVideo ? <Loader2 size={14} className="animate-spin" /> : <Video size={14} />}
+                  {uploadingVideo ? 'Subiendo video...' : home.video_url ? 'Cambiar video' : 'Subir video'}
+                </button>
+                <input ref={videoRef} type="file" accept="video/*" className="hidden"
+                  onChange={e => e.target.files && subirArchivo(e.target.files[0], 'video')} />
+              </div>
+            </Field>
+          )}
+
+          {/* Guardar */}
+          <button
+            onClick={() => onSave(home, index)}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 bg-white text-black py-3.5 rounded-xl text-sm font-bold active:bg-zinc-200 disabled:opacity-40 transition mt-2"
+          >
+            {saving
+              ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
+              : <><Save size={14} /> Guardar cambios</>
+            }
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Modal eliminar */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[70]"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }} transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex items-end sm:items-center justify-center z-[80] px-4 pb-6 sm:pb-0"
             >
-              Eliminar
+              <div className="bg-[#111118] border border-zinc-800 rounded-3xl p-6 w-full max-w-sm shadow-xl">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+                  <AlertTriangle size={18} className="text-red-400" />
+                </div>
+                <h2 className="text-base font-semibold mb-2">¿Eliminar este evento?</h2>
+                <p className="text-sm text-zinc-400 mb-6">
+                  Se eliminará <span className="text-white font-medium">"{home.titulo}"</span> de la home pública.
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 py-3.5 text-sm rounded-2xl border border-zinc-700 text-zinc-300 active:bg-zinc-800 transition">
+                    Cancelar
+                  </button>
+                  <button onClick={() => { onDelete(home.id); setShowDeleteConfirm(false) }}
+                    className="flex-1 py-3.5 text-sm rounded-2xl bg-red-600 text-white font-semibold active:bg-red-700 transition">
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+export default function AdminHomePage() {
+  const [homes, setHomes] = useState<HomeContent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [creando, setCreando] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  const addToast = (message: string, type: 'success' | 'error') => {
+    const id = Date.now()
+    setToasts(prev => [...prev, { id, message, type }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500)
+  }
+
+  useEffect(() => {
+    const cargar = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { window.location.href = '/login'; return }
+      const { data } = await supabase.from('home_content').select('*').order('updated_at', { ascending: true })
+      setHomes(data || [])
+      setLoading(false)
+    }
+    cargar()
+  }, [])
+
+  const actualizarCampo = (id: string, campo: keyof HomeContent, valor: string | null) => {
+    setHomes(prev => prev.map(h => h.id === id ? { ...h, [campo]: valor } : h))
+  }
+
+  const guardar = async (home: HomeContent, index: number) => {
+    setSavingId(home.id)
+    const { error } = await supabase.from('home_content').update({
+      titulo: home.titulo,
+      descripcion: home.descripcion,
+      flyer_url: home.flyer_url,
+      video_url: index === 0 ? home.video_url : '',
+      boton_texto: home.boton_texto || null,
+      boton_link: home.boton_link || null,
+      fecha_evento: home.fecha_evento || null,
+    }).eq('id', home.id)
+
+    setSavingId(null)
+    if (error) addToast('Error al guardar', 'error')
+    else addToast('Evento guardado', 'success')
+  }
+
+  const crearEvento = async () => {
+    if (homes.length >= 2) { addToast('Máximo 2 eventos permitidos', 'error'); return }
+    setCreando(true)
+    const { data, error } = await supabase.from('home_content').insert({
+      titulo: 'Nuevo Evento',
+      descripcion: 'Descripción del evento',
+      flyer_url: '',
+      boton_texto: null,
+      boton_link: null,
+    }).select().single()
+
+    if (error) addToast('Error al crear evento', 'error')
+    else setHomes(prev => [...prev, data])
+    setCreando(false)
+  }
+
+  const eliminarEvento = async (id: string) => {
+    const { error } = await supabase.from('home_content').delete().eq('id', id)
+    if (error) addToast('Error al eliminar', 'error')
+    else { setHomes(prev => prev.filter(h => h.id !== id)); addToast('Evento eliminado', 'success') }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-300 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <ToastContainer toasts={toasts} />
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="max-w-2xl mx-auto space-y-5 pb-24"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-white">Home Pública</h1>
+            <p className="text-sm text-zinc-500 mt-1">
+              {homes.length === 0 ? 'No hay eventos' : `${homes.length} de 2 eventos`}
+            </p>
+          </div>
+          {homes.length < 2 && (
+            <button
+              onClick={crearEvento}
+              disabled={creando}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold active:bg-zinc-200 disabled:opacity-40 transition"
+            >
+              {creando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {creando ? 'Creando...' : 'Agregar evento'}
+            </button>
+          )}
+        </div>
+
+        {/* Cards */}
+        {homes.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+              <ImageIcon size={22} className="text-zinc-600" />
+            </div>
+            <div>
+              <p className="text-sm text-zinc-500">No hay eventos en la home</p>
+              <p className="text-xs text-zinc-600 mt-1">Agregá hasta 2 eventos para mostrar en la home pública</p>
+            </div>
+            <button
+              onClick={crearEvento}
+              disabled={creando}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-black text-sm font-semibold active:bg-zinc-200 disabled:opacity-40 transition mt-2"
+            >
+              <Plus size={14} />
+              Agregar primer evento
             </button>
           </div>
-        </div>
-      ))}
-
-      {homes.length < 2 && (
-        <button
-          onClick={crearEvento}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-        >
-          + Agregar Evento
-        </button>
-      )}
-    </div>
+        ) : (
+          homes.map((home, idx) => (
+            <EventCard
+              key={home.id}
+              home={home}
+              index={idx}
+              onUpdate={actualizarCampo}
+              onSave={guardar}
+              onDelete={eliminarEvento}
+              saving={savingId === home.id}
+            />
+          ))
+        )}
+      </motion.div>
+    </>
   )
 }

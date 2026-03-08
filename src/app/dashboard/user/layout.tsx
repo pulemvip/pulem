@@ -175,11 +175,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       // 2. Perfil + config en paralelo — no bloquean la navegación
       const [perfilRes, configRes] = await Promise.all([
-        supabase.from('usuarios').select('rol, avatar_url').eq('id', authData.user.id).single(),
+        supabase.from('usuarios').select('rol, avatar_url, activo').eq('id', authData.user.id).single(),
         supabase.from('configuracion').select('mantenimiento, mensaje_mantenimiento').eq('id', 'global').single(),
       ])
 
       if (cancelled) return
+
+      // Usuario desactivado → cerrar sesión
+      if (perfilRes.data?.activo === false) {
+        await supabase.auth.signOut()
+        router.replace('/login')
+        return
+      }
 
       const rol = perfilRes.data?.rol ?? 'vendedor'
 
@@ -216,18 +223,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelled = true }
   }, [router])
 
-  // Refrescar avatar al cambiar de página (sin bloquear)
+  // Refrescar avatar + verificar activo al cambiar de página (sin bloquear)
   useEffect(() => {
     let cancelled = false
     const refreshAvatar = async () => {
       const { data } = await supabase.auth.getUser()
       if (!data.user || cancelled) return
-      const { data: perfil } = await supabase.from('usuarios').select('avatar_url').eq('id', data.user.id).single()
-      if (!cancelled && perfil?.avatar_url) setAvatarUrl(perfil.avatar_url)
+      const { data: perfil } = await supabase
+        .from('usuarios')
+        .select('avatar_url, activo')
+        .eq('id', data.user.id)
+        .single()
+      if (cancelled) return
+      if (perfil?.activo === false) {
+        await supabase.auth.signOut()
+        router.replace('/login')
+        return
+      }
+      if (perfil?.avatar_url) setAvatarUrl(perfil.avatar_url)
     }
     refreshAvatar()
     return () => { cancelled = true }
-  }, [pathname])
+  }, [pathname, router])
 
   const cerrarSesion = useCallback(async () => {
     await supabase.auth.signOut()

@@ -17,6 +17,7 @@ type AccionType =
   | 'usuario_activado'
   | 'usuario_desactivado'
   | 'lista_limpiada'
+  | 'session_iniciada'
 
 type RegistrarAccionParams = {
   accion: AccionType
@@ -63,6 +64,7 @@ export const ACCION_LABELS: Record<AccionType, string> = {
   usuario_activado: 'Usuario activado',
   usuario_desactivado: 'Usuario desactivado',
   lista_limpiada: 'Lista limpiada',
+  session_iniciada: 'Entró a la app',
 }
 
 export const ACCION_COLORS: Record<AccionType, string> = {
@@ -79,4 +81,5 @@ export const ACCION_COLORS: Record<AccionType, string> = {
   usuario_activado: 'text-emerald-400',
   usuario_desactivado: 'text-red-400',
   lista_limpiada: 'text-red-500',
+  session_iniciada: 'text-zinc-400',
 }

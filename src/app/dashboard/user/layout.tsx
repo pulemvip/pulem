@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarAccion } from '@/lib/historial'
 import Image from 'next/image'
 import Link from 'next/link'
 import { PushBanner } from '@/components/PushBanner'
@@ -11,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Trophy, Home, UserCheck, Shield, LogOut,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Receipt, User, MoreHorizontal, X, Wrench,
+  Receipt, User, MoreHorizontal, X, Wrench, BarChart2, History, Bell, UserCog,
 } from 'lucide-react'
 
 function getInitials(email: string): string {
@@ -169,10 +170,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       setUserEmail(authData.user.email ?? null)
-      // Marcamos auth lista YA — el layout se muestra y la nav funciona
-      setAuthReady(true)
 
-      // 2. Perfil + config en paralelo — no bloquean la navegación
+      // 2. Perfil + config en paralelo
       const [perfilRes, configRes] = await Promise.all([
         supabase.from('usuarios').select('rol, avatar_url').eq('id', authData.user.id).single(),
         supabase.from('configuracion').select('mantenimiento, mensaje_mantenimiento').eq('id', 'global').single(),
@@ -183,10 +182,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (perfilRes.data?.rol) setUserRole(perfilRes.data.rol)
       if (perfilRes.data?.avatar_url) setAvatarUrl(perfilRes.data.avatar_url)
 
+      // Registrar login una sola vez por sesión de browser (solo vendedores)
+      if (perfilRes.data?.rol === 'vendedor') {
+        const sessionKey = `login_registrado_${authData.user.id}`
+        if (!sessionStorage.getItem(sessionKey)) {
+          sessionStorage.setItem(sessionKey, '1')
+          registrarAccion({ accion: 'session_iniciada' })
+        }
+      }
+
       if (configRes.data?.mantenimiento && perfilRes.data?.rol !== 'admin') {
         setMantenimiento(true)
         setMensajeMantenimiento(configRes.data.mensaje_mantenimiento)
       }
+
+      // Vendedor solo puede acceder a /clientes y /perfil
+      const rol = perfilRes.data?.rol ?? 'vendedor'
+      if (rol === 'vendedor') {
+        const path = window.location.pathname
+        const allowed = ['/dashboard/user/clientes', '/dashboard/user/perfil']
+        if (!allowed.some(p => path.startsWith(p))) {
+          router.replace('/dashboard/user/clientes')
+          return
+        }
+      }
+
+      setAuthReady(true)
     }
 
     init()
@@ -228,15 +249,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <MantenimientoScreen mensaje={mensajeMantenimiento} onLogout={cerrarSesion} />
   }
 
+  const isJefeOrAdmin = userRole === 'admin' || userRole === 'jefe'
+  const isVendedor = userRole === 'vendedor'
+
   const mainNavItems = [
     { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
-    { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
-    { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
-    { href: '/dashboard/user/ranking', label: 'Ranking', icon: Trophy },
+    ...(!isVendedor ? [
+      { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
+      { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
+      { href: '/dashboard/user/ranking', label: 'Ranking', icon: Trophy },
+    ] : []),
   ]
 
   const secondaryNavItems = [
-    { href: '/dashboard/user/home', label: 'Home Pública', icon: Home },
+    ...(!isVendedor ? [{ href: '/dashboard/user/home', label: 'Home Pública', icon: Home }] : []),
+    ...(isJefeOrAdmin ? [
+      { href: '/dashboard/user/stats', label: 'Resumen', icon: BarChart2 },
+      { href: '/dashboard/user/mi-equipo', label: 'Mi equipo', icon: UserCog },
+      { href: '/dashboard/user/historial', label: 'Historial', icon: History },
+      { href: '/dashboard/user/asignar-clientes', label: 'Asignar clientes', icon: Users },
+    ] : []),
     { href: '/dashboard/user/perfil', label: 'Mi perfil', icon: User },
     ...(userRole === 'admin' ? [{ href: '/dashboard/admin', label: 'Panel Admin', icon: Shield }] : []),
   ]
@@ -246,17 +278,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       key: 'crm', label: 'CRM',
       items: [
         { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
-        { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
-        { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
+        ...(!isVendedor ? [
+          { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
+          { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
+        ] : []),
       ],
     },
-    {
+    ...(!isVendedor ? [{
       key: 'marketing', label: 'Marketing',
       items: [
         { href: '/dashboard/user/ranking', label: 'Ranking', icon: Trophy },
         { href: '/dashboard/user/home', label: 'Home Pública', icon: Home },
       ],
-    },
+    }] : []),
+    ...(isJefeOrAdmin ? [{
+      key: 'jefe', label: 'Gestión',
+      items: [
+        { href: '/dashboard/user/stats', label: 'Resumen', icon: BarChart2 },
+        { href: '/dashboard/user/mi-equipo', label: 'Mi equipo', icon: UserCog },
+        { href: '/dashboard/user/historial', label: 'Historial', icon: History },
+        { href: '/dashboard/user/asignar-clientes', label: 'Asignar clientes', icon: Users },
+      ],
+    }] : []),
     {
       key: 'admin', label: 'Administración',
       items: userRole === 'admin' ? [{ href: '/dashboard/admin', label: 'Panel Admin', icon: Shield }] : [],

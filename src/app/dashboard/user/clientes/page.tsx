@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, Lock, Unlock, CheckCheck, X, Save } from 'lucide-react'
 
@@ -59,12 +60,14 @@ function StatCard({ label, value, color }: { label: string; value: number; color
 }
 
 export default function ClientesUserPage() {
+  const router = useRouter()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [mensaje, setMensaje] = useState('')
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [editandoMensaje, setEditandoMensaje] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [rolNoPermitido, setRolNoPermitido] = useState(false)
 
   const semanaActual = getSemanaActual()
 
@@ -77,19 +80,36 @@ export default function ClientesUserPage() {
   useEffect(() => {
     const cargarTodo = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/login'; return }
+      if (!user) { router.replace('/login'); return }
+
+      const { data: perfil } = await supabase
+        .from('usuarios').select('rol').eq('id', user.id).single()
+
+      const rol = perfil?.rol ?? 'vendedor'
+
+      // Jefe no tiene acceso a esta sección
+      if (rol === 'jefe') {
+        setRolNoPermitido(true)
+        setLoading(false)
+        return
+      }
+
+      // Admin ve todos los clientes, vendedor solo los suyos
+      const clientesQuery = rol === 'admin'
+        ? supabase.from('clientes').select('*').order('nombre')
+        : supabase.from('clientes').select('*').eq('user_id', user.id).order('nombre')
 
       const [{ data: clientesData }, { data: settings }] = await Promise.all([
-        supabase.from('clientes').select('*').eq('user_id', user.id).order('nombre'),
+        clientesQuery,
         supabase.from('user_settings').select('mensaje').eq('user_id', user.id).single(),
       ])
 
       setClientes((clientesData as Cliente[]) || [])
-      setMensaje(settings?.mensaje ?? `Hola {{nombre}} 👋\nTe escribo de PULEM VIP.\n¿Te paso info de la próxima fecha? 🔥`)
+      setMensaje(settings?.mensaje ?? `Hola {{nombre}} 👋\nTe escribo de Aura.\n¿Te paso info de la próxima fecha? 🔥`)
       setLoading(false)
     }
     cargarTodo()
-  }, [])
+  }, [router])
 
   const guardarMensaje = async () => {
     setGuardando(true)
@@ -126,6 +146,20 @@ export default function ClientesUserPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-6 h-6 rounded-full border-2 border-zinc-600 border-t-zinc-300 animate-spin" />
+      </div>
+    )
+  }
+
+  if (rolNoPermitido) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center px-6">
+        <div className="w-12 h-12 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+          <Lock size={20} className="text-zinc-500" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-300">Sección no disponible</p>
+          <p className="text-xs text-zinc-600 mt-1">Esta sección es solo para vendedores.</p>
+        </div>
       </div>
     )
   }

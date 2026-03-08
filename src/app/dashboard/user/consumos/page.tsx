@@ -126,7 +126,7 @@ export default function ConsumosPage() {
   }
 
   const eliminarConsumo = async (id: string, ownerId: string) => {
-    if (userRole !== 'admin' && ownerId !== userIdActual) return
+    if (userRole !== 'admin' && userRole !== 'jefe' && ownerId !== userIdActual) return
     const consumo = consumos.find(c => c.id === id)
     const nombre = consumo?.nombre ?? ''
     const { error } = await supabase.from('consumos').delete().eq('id', id)

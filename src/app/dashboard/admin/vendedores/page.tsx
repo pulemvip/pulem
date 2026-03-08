@@ -245,6 +245,7 @@ export default function VendedoresPage() {
                     className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-zinc-500 transition appearance-none cursor-pointer"
                   >
                     <option value="vendedor">Vendedor</option>
+                    <option value="jefe">Jefe</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
@@ -311,6 +312,13 @@ export default function VendedoresPage() {
                       }`}>
                         {v.activo ? 'Activo' : 'Inactivo'}
                       </span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                        v.rol === 'admin' ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                        : v.rol === 'jefe' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-500'
+                      }`}>
+                        {v.rol === 'admin' ? 'Admin' : v.rol === 'jefe' ? 'Jefe' : 'Vendedor'}
+                      </span>
                       <span className="text-[10px] text-zinc-600">{v.total} clientes · {v.conversion}% conv.</span>
                     </div>
                   </div>
@@ -318,11 +326,12 @@ export default function VendedoresPage() {
                   {/* Rol select */}
                   <div className="relative shrink-0 hidden sm:block">
                     <select
-                      value={v.rol === 'admin' ? 'admin' : 'vendedor'}
+                      value={v.rol}
                       onChange={e => actualizarVendedor(v.vendedor_id, 'rol', e.target.value)}
                       className="bg-zinc-900 border border-zinc-700 rounded-xl pl-3 pr-7 py-2 text-xs text-zinc-300 focus:outline-none appearance-none cursor-pointer"
                     >
                       <option value="vendedor">Vendedor</option>
+                      <option value="jefe">Jefe</option>
                       <option value="admin">Admin</option>
                     </select>
                     <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />

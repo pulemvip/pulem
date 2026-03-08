@@ -378,20 +378,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const active = pathname === item.href
             const Icon = item.icon
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
-                prefetch={true}
-                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${active ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}
+                onTouchStart={() => router.push(item.href)}
+                onClick={() => router.push(item.href)}
+                style={{ touchAction: 'manipulation' }}
+                className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl flex-1 ${active ? 'text-white' : 'text-zinc-500'}`}
               >
                 <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
                 <span className={`text-[10px] font-medium ${active ? 'text-white' : 'text-zinc-500'}`}>{item.label}</span>
-              </Link>
+              </button>
             )
           })}
           <button
+            onTouchStart={() => setMoreOpen(true)}
             onClick={() => setMoreOpen(true)}
-            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition flex-1 ${secondaryNavItems.some(i => i.href === pathname) ? 'text-white' : 'text-zinc-500 active:text-zinc-300'}`}
+            style={{ touchAction: 'manipulation' }}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl flex-1 ${secondaryNavItems.some(i => i.href === pathname) ? 'text-white' : 'text-zinc-500'}`}
           >
             <MoreHorizontal size={22} strokeWidth={1.8} />
             <span className="text-[10px] font-medium">Más</span>
@@ -424,10 +427,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   const active = pathname === item.href
                   const Icon = item.icon
                   return (
-                    <Link key={item.href} href={item.href} prefetch={true} onClick={() => setMoreOpen(false)} className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition ${active ? 'bg-zinc-800 text-white' : 'text-zinc-300 active:bg-zinc-800'}`}>
+                    <button
+                      key={item.href}
+                      onTouchStart={() => { setMoreOpen(false); router.push(item.href) }}
+                      onClick={() => { setMoreOpen(false); router.push(item.href) }}
+                      style={{ touchAction: 'manipulation' }}
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm w-full text-left ${active ? 'bg-zinc-800 text-white' : 'text-zinc-300'}`}
+                    >
                       <Icon size={20} />
                       {item.label}
-                    </Link>
+                    </button>
                   )
                 })}
               </div>

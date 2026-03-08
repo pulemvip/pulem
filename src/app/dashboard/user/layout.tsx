@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, Trophy, Home, UserCheck, Shield, LogOut,
   ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Receipt, User, MoreHorizontal, X, Wrench, BarChart2, History, Bell, UserCog,
+  Receipt, User, MoreHorizontal, X, Wrench, BarChart2, History, Bell, UserCog, Cake,
 } from 'lucide-react'
 
 function getInitials(email: string): string {
@@ -287,6 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       { href: '/dashboard/user/mi-equipo', label: 'Mi equipo', icon: UserCog },
       { href: '/dashboard/user/historial', label: 'Historial', icon: History },
       { href: '/dashboard/user/asignar-clientes', label: 'Asignar clientes', icon: Users },
+      { href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake },
     ] : []),
     { href: '/dashboard/user/perfil', label: 'Mi perfil', icon: User },
     ...(userRole === 'admin' ? [{ href: '/dashboard/admin', label: 'Panel Admin', icon: Shield }] : []),
@@ -317,6 +318,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: '/dashboard/user/mi-equipo', label: 'Mi equipo', icon: UserCog },
         { href: '/dashboard/user/historial', label: 'Historial', icon: History },
         { href: '/dashboard/user/asignar-clientes', label: 'Asignar clientes', icon: Users },
+        { href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake },
       ],
     }] : []),
     {

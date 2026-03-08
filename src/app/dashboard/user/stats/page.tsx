@@ -119,9 +119,8 @@ export default function JefeStatsPage() {
           Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          tipo: 'mensaje',
-          titulo: '📢 Mensaje del jefe',
-          cuerpo: 'Revisá la app, hay novedades.',
+          title: '📢 Mensaje del jefe',
+          body: 'Revisá la app, hay novedades.',
         }),
       })
       if (res.ok) showToast('Notificación enviada a todos', 'success')

@@ -55,14 +55,26 @@ function IOSInstallBanner({ onDismiss }: { onDismiss: () => void }) {
   )
 }
 
+const DISMISS_KEY = 'push_banner_dismissed'
+
 export function PushBanner() {
   const { permission, subscribed, loading, subscribe } = usePushNotifications()
-  const [dismissed, setDismissed] = useState(false)
+  const [dismissed, setDismissed] = useState(true) // empieza oculto hasta que carga localStorage
   const { isIOS, isInstalled } = useIsIOS()
+
+  useEffect(() => {
+    const stored = localStorage.getItem(DISMISS_KEY)
+    if (!stored) setDismissed(false)
+  }, [])
+
+  const dismiss = () => {
+    localStorage.setItem(DISMISS_KEY, '1')
+    setDismissed(true)
+  }
 
   // iOS no instalada → mostrar banner de instalación
   if (isIOS && !isInstalled && !dismissed) {
-    return <IOSInstallBanner onDismiss={() => setDismissed(true)} />
+    return <IOSInstallBanner onDismiss={dismiss} />
   }
 
   // Ocultar si ya suscripto, rechazó, o cerró el banner
@@ -100,7 +112,7 @@ export function PushBanner() {
                 : 'Activar'
               }
             </button>
-            <button onClick={() => setDismissed(true)} className="text-blue-400 hover:text-blue-200 transition">
+            <button onClick={dismiss} className="text-blue-400 hover:text-blue-200 transition">
               <X size={16} />
             </button>
           </div>

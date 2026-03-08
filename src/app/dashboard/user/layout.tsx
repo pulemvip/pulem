@@ -170,8 +170,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       setUserEmail(authData.user.email ?? null)
+      // Mostramos el layout YA — navegación instantánea
+      setAuthReady(true)
 
-      // 2. Perfil + config en paralelo
+      // 2. Perfil + config en paralelo — no bloquean la navegación
       const [perfilRes, configRes] = await Promise.all([
         supabase.from('usuarios').select('rol, avatar_url').eq('id', authData.user.id).single(),
         supabase.from('configuracion').select('mantenimiento, mensaje_mantenimiento').eq('id', 'global').single(),
@@ -179,11 +181,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if (cancelled) return
 
+      const rol = perfilRes.data?.rol ?? 'vendedor'
+
       if (perfilRes.data?.rol) setUserRole(perfilRes.data.rol)
       if (perfilRes.data?.avatar_url) setAvatarUrl(perfilRes.data.avatar_url)
 
-      // Registrar login una sola vez por sesión de browser (solo vendedores)
-      if (perfilRes.data?.rol === 'vendedor') {
+      // Registrar login una sola vez por sesión (solo vendedores)
+      if (rol === 'vendedor') {
         const sessionKey = `login_registrado_${authData.user.id}`
         if (!sessionStorage.getItem(sessionKey)) {
           sessionStorage.setItem(sessionKey, '1')
@@ -191,23 +195,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
       }
 
-      if (configRes.data?.mantenimiento && perfilRes.data?.rol !== 'admin') {
+      // Mantenimiento — se aplica después, reemplaza el layout
+      if (configRes.data?.mantenimiento && rol !== 'admin') {
         setMantenimiento(true)
         setMensajeMantenimiento(configRes.data.mensaje_mantenimiento)
+        return
       }
 
       // Vendedor solo puede acceder a /clientes y /perfil
-      const rol = perfilRes.data?.rol ?? 'vendedor'
       if (rol === 'vendedor') {
         const path = window.location.pathname
         const allowed = ['/dashboard/user/clientes', '/dashboard/user/perfil']
         if (!allowed.some(p => path.startsWith(p))) {
           router.replace('/dashboard/user/clientes')
-          return
         }
       }
-
-      setAuthReady(true)
     }
 
     init()

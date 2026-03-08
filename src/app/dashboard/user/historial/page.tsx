@@ -28,6 +28,7 @@ const ACCIONES_FILTER = [
 
 function formatFecha(fecha: string) {
   const d = new Date(fecha)
+   const opts = { timeZone: 'America/Argentina/Buenos_Aires' }
   return {
     fecha: d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
     hora: d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),

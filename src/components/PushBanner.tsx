@@ -1,18 +1,76 @@
 'use client'
 
 import { usePushNotifications } from '@/lib/usePushNotifications'
-import { Bell, X, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { Bell, X, Loader2, Share, Plus } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+function useIsIOS() {
+  const [isIOS, setIsIOS] = useState(false)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  useEffect(() => {
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const installed = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as any).standalone === true
+    setIsIOS(ios)
+    setIsInstalled(installed)
+  }, [])
+
+  return { isIOS, isInstalled }
+}
+
+function IOSInstallBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.3 }}
+        className="mb-4"
+      >
+        <div className="px-4 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <Bell size={16} className="text-blue-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-blue-300 font-medium">Activá las notificaciones</p>
+                <p className="text-xs text-blue-400/70 mt-1 leading-relaxed">
+                  En iPhone, instalá la app primero:{' '}
+                  <span className="inline-flex items-center gap-1 font-medium">
+                    tocá <Share size={11} className="inline" /> y luego
+                    "Agregar a inicio" <Plus size={11} className="inline" />
+                  </span>
+                </p>
+              </div>
+            </div>
+            <button onClick={onDismiss} className="text-blue-400 hover:text-blue-200 transition shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
 
 export function PushBanner() {
   const { permission, subscribed, loading, subscribe } = usePushNotifications()
   const [dismissed, setDismissed] = useState(false)
+  const { isIOS, isInstalled } = useIsIOS()
 
-  // Ocultar solo si ya está suscripto, rechazó explícitamente, o cerró el banner
+  // iOS no instalada → mostrar banner de instalación
+  if (isIOS && !isInstalled && !dismissed) {
+    return <IOSInstallBanner onDismiss={() => setDismissed(true)} />
+  }
+
+  // Ocultar si ya suscripto, rechazó, o cerró el banner
   if (subscribed || permission === 'denied' || dismissed) return null
 
-  // Texto distinto si ya dio permiso pero no está suscripto
+  // Notificaciones no soportadas (browser viejo, etc)
+  if (typeof window !== 'undefined' && !('Notification' in window)) return null
+
   const texto = permission === 'granted'
     ? 'Reactivá las notificaciones para recibir avisos'
     : 'Activá las notificaciones para recibir avisos del admin'
@@ -42,10 +100,7 @@ export function PushBanner() {
                 : 'Activar'
               }
             </button>
-            <button
-              onClick={() => setDismissed(true)}
-              className="text-blue-400 hover:text-blue-200 transition"
-            >
+            <button onClick={() => setDismissed(true)} className="text-blue-400 hover:text-blue-200 transition">
               <X size={16} />
             </button>
           </div>

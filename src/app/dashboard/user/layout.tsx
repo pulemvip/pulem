@@ -273,6 +273,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const mainNavItems = [
     { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
+    ...(isJefeOrAdmin ? [{ href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake }] : []),
     ...(!isVendedor ? [
       { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
       { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
@@ -298,6 +299,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       key: 'crm', label: 'CRM',
       items: [
         { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
+        ...(isJefeOrAdmin ? [{ href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake }] : []),
         ...(!isVendedor ? [
           { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
           { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
@@ -318,7 +320,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: '/dashboard/user/mi-equipo', label: 'Mi equipo', icon: UserCog },
         { href: '/dashboard/user/historial', label: 'Historial', icon: History },
         { href: '/dashboard/user/asignar-clientes', label: 'Asignar clientes', icon: Users },
-        { href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake },
       ],
     }] : []),
     {

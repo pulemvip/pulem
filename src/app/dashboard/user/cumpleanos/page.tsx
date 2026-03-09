@@ -105,6 +105,8 @@ export default function CumpleanosPage() {
   const [showConfirmDistribuir, setShowConfirmDistribuir] = useState(false)
   const [preview, setPreview] = useState<{ id: string; email: string; cantidad: number }[]>([])
   const [totalSinAsignar, setTotalSinAsignar] = useState(0)
+  const [staffDisponible, setStaffDisponible] = useState<{ id: string; email: string }[]>([])
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set())
 
   const addToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now()
@@ -182,10 +184,26 @@ export default function CumpleanosPage() {
     if (!staff || staff.length < 1) { addToast('No hay admins/jefes activos', 'error'); return }
     const { count: total } = await supabase.from('cumpleanos').select('*', { count: 'exact', head: true })
     if (!total || total === 0) { addToast('No hay cumpleaños para distribuir', 'error'); return }
-    const porPersona = Math.floor(total / staff.length)
-    const resto = total % staff.length
-    setPreview(staff.map((s, i) => ({ id: s.id, email: s.email, cantidad: porPersona + (i < resto ? 1 : 0) })))
+    setStaffDisponible(staff)
+    setSeleccionados(new Set(staff.map(s => s.id)))
+    recalcularPreview(staff, staff.map(s => s.id), total)
     setShowConfirmDistribuir(true)
+  }
+
+  const recalcularPreview = (staff: { id: string; email: string }[], ids: string[], total: number) => {
+    const activos = staff.filter(s => ids.includes(s.id))
+    if (activos.length === 0) { setPreview([]); return }
+    const porPersona = Math.floor(total / activos.length)
+    const resto = total % activos.length
+    setPreview(activos.map((s, i) => ({ id: s.id, email: s.email, cantidad: porPersona + (i < resto ? 1 : 0) })))
+  }
+
+  const toggleSeleccionado = async (id: string) => {
+    const next = new Set(seleccionados)
+    if (next.has(id)) { if (next.size <= 1) return; next.delete(id) } else { next.add(id) }
+    setSeleccionados(next)
+    const { count: total } = await supabase.from('cumpleanos').select('*', { count: 'exact', head: true })
+    recalcularPreview(staffDisponible, Array.from(next), total ?? 0)
   }
 
   const distribuir = async () => {
@@ -425,15 +443,25 @@ export default function CumpleanosPage() {
                 <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
                   <Shuffle size={18} className="text-blue-400" />
                 </div>
-                <h2 className="text-base font-semibold mb-1">¿Distribuir cumpleaños?</h2>
-                <p className="text-sm text-zinc-500 mb-4">Así quedaría el reparto entre admins y jefes:</p>
-                <div className="space-y-2 mb-5">
-                  {preview.map(p => (
-                    <div key={p.id} className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-400 truncate max-w-[200px]">{p.email}</span>
-                      <span className="font-bold text-white ml-3">{p.cantidad}</span>
-                    </div>
-                  ))}
+                <h2 className="text-base font-semibold mb-1">Distribuir cumpleaños</h2>
+                <p className="text-sm text-zinc-500 mb-4">Elegí a quiénes incluir en el reparto:</p>
+                <div className="space-y-2 mb-4">
+                  {staffDisponible.map(s => {
+                    const sel = seleccionados.has(s.id)
+                    const cant = preview.find(p => p.id === s.id)?.cantidad ?? 0
+                    return (
+                      <button key={s.id} onClick={() => toggleSeleccionado(s.id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition text-sm ${sel ? 'bg-zinc-800 border-zinc-600' : 'border-zinc-800 opacity-50'}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition ${sel ? 'bg-white border-white' : 'border-zinc-600'}`}>
+                            {sel && <CheckCheck size={10} className="text-black" />}
+                          </div>
+                          <span className="text-zinc-300 truncate max-w-[160px]">{s.email}</span>
+                        </div>
+                        {sel && <span className="text-white font-bold ml-2 shrink-0">{cant}</span>}
+                      </button>
+                    )
+                  })}
                 </div>
                 <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2.5 mb-5">
                   <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />

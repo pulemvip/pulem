@@ -23,7 +23,7 @@ type HomeEvent = {
 function SkeletonCard() {
   return (
     <div className="rounded-2xl overflow-hidden bg-zinc-950 animate-pulse">
-      <div className="w-full h-80 sm:h-80 md:h-96 bg-zinc-800" />
+      <div className="w-full h-56 sm:h-64 md:h-72 bg-zinc-800" />
       <div className="p-4 sm:p-5 space-y-3">
         <div className="h-5 bg-zinc-800 rounded-lg w-2/3" />
         <div className="h-4 bg-zinc-800 rounded-lg w-1/2" />
@@ -41,14 +41,11 @@ function isEventoPasado(fecha?: string | null): boolean {
   return fechaEvento < hoy
 }
 
-/* ===== PANTALLA MANTENIMIENTO HOME ===== */
 function MantenimientoHome({ mensaje }: { mensaje: string }) {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-6 text-center relative overflow-hidden">
-      {/* Fondo sutil */}
       <div className="absolute inset-0 bg-gradient-to-br from-zinc-950 via-black to-zinc-950" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.03)_0%,_transparent_70%)]" />
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -56,14 +53,12 @@ function MantenimientoHome({ mensaje }: { mensaje: string }) {
         className="relative z-10 space-y-8 max-w-md"
       >
         <Image src="/logo.png" alt="Logo" width={140} height={50} className="mx-auto drop-shadow-lg" />
-
         <div className="space-y-4">
           <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
             <Sparkles size={28} className="text-white/60" />
           </div>
           <p className="text-zinc-300 text-lg leading-relaxed">{mensaje}</p>
         </div>
-
         <div className="flex items-center justify-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-white/30 animate-pulse" />
           <div className="w-1.5 h-1.5 rounded-full bg-white/30 animate-pulse [animation-delay:0.2s]" />
@@ -86,12 +81,10 @@ export default function Home() {
         supabase.from('configuracion').select('mantenimiento_home, mensaje_mantenimiento_home').eq('id', 'global').single(),
         supabase.from('home_content').select('*').eq('activo', true).order('orden', { ascending: true }),
       ])
-
       if (configData?.mantenimiento_home) {
         setMantenimientoHome(true)
         setMensajeMantenimiento(configData.mensaje_mantenimiento_home)
       }
-
       setTimeout(() => {
         if (!error && eventsData) setEvents(eventsData)
         setLoading(false)
@@ -109,7 +102,6 @@ export default function Home() {
     }
   }
 
-  // Mostrar pantalla de mantenimiento si está activo
   if (!loading && mantenimientoHome) {
     return <MantenimientoHome mensaje={mensajeMantenimiento} />
   }
@@ -128,10 +120,10 @@ export default function Home() {
 
       <div className="absolute inset-0 bg-black/50 z-10" />
 
-      <div className="relative z-20 px-4 sm:px-6 py-6 max-w-7xl mx-auto">
+      <div className="relative z-20 px-6 sm:px-12 lg:px-20 py-6 max-w-6xl mx-auto">
 
         {/* HEADER */}
-        <div className="flex justify-between items-center mb-4 pt-1 pb-1">
+        <div className="flex justify-between items-center mb-8 pt-1 pb-1">
           <Image src="/logo.png" alt="Logo" width={140} height={50} className="drop-shadow-lg" />
           <Link
             href="/login"
@@ -141,27 +133,30 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* GRID */}
-        <div className="grid gap-8 sm:gap-16 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2">
+        {/* GRID — siempre centrado y simétrico */}
+        <div className={`grid gap-8 sm:gap-16 ${
+          loading || events.length === 1
+            ? 'grid-cols-1 max-w-xs mx-auto'
+            : 'grid-cols-1 sm:grid-cols-2 sm:gap-40 md:gap-52'
+        }`}>
           {loading ? (
             <>
               <SkeletonCard />
               <SkeletonCard />
             </>
           ) : events.length === 0 ? (
-            <div className="col-span-2 text-center text-zinc-300 py-20">
+            <div className="text-center text-zinc-300 py-20">
               No hay eventos activos
             </div>
           ) : (
-            events.map((event, idx) => {
+            events.map((event) => {
               const { dia, mes } = formatDate(event.fecha_evento)
               const pasado = isEventoPasado(event.fecha_evento)
-              const marginClass = idx === 0 ? 'sm:mr-auto' : idx === 1 ? 'sm:ml-auto' : ''
 
               const inner = (
                 <>
                   {event.flyer_url && (
-                    <div className="relative w-full h-80 sm:h-80 md:h-96 overflow-hidden">
+                    <div className="relative w-full h-72 sm:h-80 md:h-[420px] overflow-hidden">
                       <img
                         src={event.flyer_url}
                         alt={event.titulo}
@@ -172,7 +167,6 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Cartel FINALIZADO — esquina a esquina tipo estampilla */}
                   {pasado && (
                     <div className="absolute inset-0 z-40 pointer-events-none overflow-hidden rounded-2xl">
                       <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[38deg] w-[160%] py-4 text-center bg-black/85 border-y-2 border-white/20 backdrop-blur-[2px]">
@@ -196,7 +190,7 @@ export default function Home() {
                     </div>
                   )}
 
-                  <div className={`p-3 sm:p-5 space-y-1.5 relative z-30 rounded-b-xl ${pasado ? 'bg-zinc-950' : 'bg-zinc-950'}`}>
+                  <div className="p-3 sm:p-4 space-y-1 relative z-30 rounded-b-xl bg-zinc-950">
                     <h2 className={`text-lg font-bold uppercase ${pasado ? 'text-zinc-500' : ''}`}>
                       {event.titulo}
                     </h2>
@@ -211,7 +205,7 @@ export default function Home() {
 
               if (pasado) {
                 return (
-                  <div key={event.id} className={`group relative rounded-2xl shadow-xl bg-zinc-950 cursor-default overflow-hidden ${marginClass}`}>
+                  <div key={event.id} className="group relative rounded-2xl shadow-xl bg-zinc-950 cursor-default overflow-hidden">
                     {inner}
                   </div>
                 )
@@ -223,7 +217,7 @@ export default function Home() {
                   href={event.boton_link || '#'}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`group relative rounded-2xl overflow-hidden shadow-xl transition duration-300 hover:scale-[1.02] bg-zinc-950 ${marginClass}`}
+                  className="group relative rounded-2xl overflow-hidden shadow-xl transition duration-300 hover:scale-[1.02] bg-zinc-950"
                 >
                   {inner}
                 </a>

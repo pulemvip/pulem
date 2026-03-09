@@ -275,9 +275,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/user/clientes', label: 'Clientes', icon: Users },
     ...(isJefeOrAdmin ? [{ href: '/dashboard/user/cumpleanos', label: 'Cumpleaños', icon: Cake }] : []),
     ...(!isVendedor ? [
-      { href: '/dashboard/user/invitados', label: 'Invitados', icon: UserCheck },
       { href: '/dashboard/user/consumos', label: 'Consumos', icon: Receipt },
-      { href: '/dashboard/user/ranking', label: 'Ranking', icon: Trophy },
     ] : []),
   ]
 

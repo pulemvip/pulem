@@ -122,8 +122,11 @@ export default function CumpleanosPage() {
       if (!perfil || !['admin', 'jefe'].includes(perfil.rol)) { router.replace('/dashboard/user/clientes'); return }
       setUserId(user.id)
       setUserRol(perfil.rol)
-      await cargarCumples(user.id, perfil.rol, false)
-      await checkSinAsignar()
+      await Promise.all([
+        cargarCumples(user.id, perfil.rol, false),
+        checkSinAsignar(),
+        cargarMensaje(user.id),
+      ])
     }
     init()
   }, [router])
@@ -131,6 +134,15 @@ export default function CumpleanosPage() {
   const checkSinAsignar = async () => {
     const { count } = await supabase.from('cumpleanos').select('*', { count: 'exact', head: true }).is('asignado_a', null)
     setTotalSinAsignar(count ?? 0)
+  }
+
+  const cargarMensaje = async (uid: string) => {
+    const { data } = await supabase
+      .from('user_settings')
+      .select('mensaje_cumpleanos')
+      .eq('user_id', uid)
+      .single()
+    if (data?.mensaje_cumpleanos) setMensaje(data.mensaje_cumpleanos)
   }
 
   const cargarCumples = async (uid: string, rol: string, todos: boolean) => {
@@ -335,7 +347,17 @@ export default function CumpleanosPage() {
                   className="text-xs text-zinc-500 hover:text-zinc-300 transition px-2 py-1">
                   Cancelar
                 </button>
-                <button onClick={() => { setMensajeOriginal(mensaje); setEditandoMensaje(false); addToast('Mensaje guardado', 'success') }}
+                <button onClick={async () => {
+                  if (userId) {
+                    await supabase.from('user_settings').upsert(
+                      { user_id: userId, mensaje_cumpleanos: mensaje },
+                      { onConflict: 'user_id' }
+                    )
+                  }
+                  setMensajeOriginal(mensaje)
+                  setEditandoMensaje(false)
+                  addToast('Mensaje guardado', 'success')
+                }}
                   className="text-xs font-semibold text-white bg-zinc-700 hover:bg-zinc-600 transition px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                   <CheckCheck size={12} /> Guardar
                 </button>

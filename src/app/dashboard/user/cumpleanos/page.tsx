@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarAccion } from '@/lib/historial'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import * as XLSX from 'xlsx'
@@ -16,6 +17,8 @@ type Cumple = {
   telefono: string | null
   fecha: string
   asignado_a: string | null
+  mensaje_enviado: boolean
+  mensaje_enviado_at: string | null
 }
 
 type Toast = { id: number; message: string; type: 'success' | 'error' }
@@ -99,6 +102,7 @@ export default function CumpleanosPage() {
   const [mensajeOriginal, setMensajeOriginal] = useState('')
   const [editandoMensaje, setEditandoMensaje] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRol, setUserRol] = useState<string>('jefe')
   const [verTodos, setVerTodos] = useState(false)
   const [distribuyendo, setDistribuyendo] = useState(false)
@@ -122,6 +126,7 @@ export default function CumpleanosPage() {
       if (!perfil || !['admin', 'jefe'].includes(perfil.rol)) { router.replace('/dashboard/user/clientes'); return }
       setUserId(user.id)
       setUserRol(perfil.rol)
+      setUserEmail(user.email ?? null)
       await Promise.all([
         cargarCumples(user.id, perfil.rol, false),
         checkSinAsignar(),
@@ -147,7 +152,7 @@ export default function CumpleanosPage() {
 
   const cargarCumples = async (uid: string, rol: string, todos: boolean) => {
     setLoading(true)
-    let query = supabase.from('cumpleanos').select('id, nombre, telefono, fecha, asignado_a').order('fecha')
+    let query = supabase.from('cumpleanos').select('id, nombre, telefono, fecha, asignado_a, mensaje_enviado, mensaje_enviado_at').order('fecha')
     if (!(rol === 'admin' && todos)) query = query.eq('asignado_a', uid)
     const { data } = await query
     setCumples(data ?? [])
@@ -253,6 +258,18 @@ export default function CumpleanosPage() {
     setShowConfirmLimpiar(false)
   }
 
+  const marcarEnviado = async (c: Cumple) => {
+    const { error } = await supabase
+      .from('cumpleanos')
+      .update({ mensaje_enviado: true, mensaje_enviado_at: new Date().toISOString() })
+      .eq('id', c.id)
+    if (!error) {
+      setCumples(prev => prev.map(x => x.id === c.id ? { ...x, mensaje_enviado: true, mensaje_enviado_at: new Date().toISOString() } : x))
+      // Registrar en historial
+      await registrarAccion({ accion: 'mensaje_cumpleanos', detalle: `Mensaje enviado a ${c.nombre}` })
+    }
+  }
+
   const filtrados = useMemo(() => cumples.filter(c => {
     const matchSearch = c.nombre.toLowerCase().includes(search.toLowerCase()) || (c.telefono ?? '').includes(search)
     const matchMes = mesFiltro === 0 || parseInt(c.fecha.split('-')[1]) === mesFiltro
@@ -312,10 +329,16 @@ export default function CumpleanosPage() {
                 <div key={c.id} className="flex items-center justify-between">
                   <p className="text-sm text-white font-medium">{c.nombre}</p>
                   {c.telefono && (
-                    <a href={`https://wa.me/${c.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje.replace('{{nombre}}', c.nombre))}`}
-                      target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-400 flex items-center gap-1">
-                      <MessageCircle size={13} /> Saludar
-                    </a>
+                    c.mensaje_enviado ? (
+                      <span className="text-xs text-zinc-600 flex items-center gap-1"><CheckCheck size={13} /> Enviado</span>
+                    ) : (
+                      <a href={`https://wa.me/${c.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje.replace('{{nombre}}', c.nombre))}`}
+                        target="_blank" rel="noopener noreferrer"
+                        onClick={() => marcarEnviado(c)}
+                        className="text-xs text-emerald-400 flex items-center gap-1">
+                        <MessageCircle size={13} /> Saludar
+                      </a>
+                    )
                   )}
                 </div>
               ))}
@@ -424,7 +447,7 @@ export default function CumpleanosPage() {
                 const esHoy = esCumpleHoy(c.fecha)
                 return (
                   <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.02 }}
-                    className={`flex items-center gap-4 px-5 py-4 ${esHoy ? 'bg-amber-500/5' : 'hover:bg-zinc-800/20'} transition`}>
+                    className={`flex items-center gap-4 px-5 py-4 ${esHoy ? 'bg-amber-500/5' : 'hover:bg-zinc-800/20'} ${c.mensaje_enviado ? 'opacity-50' : ''} transition`}>
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${esHoy ? 'bg-amber-500/15 border border-amber-500/30' : 'bg-zinc-800 border border-zinc-700'}`}>
                       {esHoy ? <PartyPopper size={16} className="text-amber-400" /> : <Cake size={16} className="text-zinc-500" />}
                     </div>
@@ -438,11 +461,19 @@ export default function CumpleanosPage() {
                     <div className="flex items-center gap-3 shrink-0">
                       <p className="text-xs text-zinc-500 tabular-nums">{formatFecha(c.fecha)}</p>
                       {c.telefono && (
-                        <a href={`https://wa.me/${c.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje.replace('{{nombre}}', c.nombre))}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition">
-                          <MessageCircle size={14} />
-                        </a>
+                        c.mensaje_enviado ? (
+                          <div title={c.mensaje_enviado_at ? `Enviado ${new Date(c.mensaje_enviado_at).toLocaleDateString('es-AR')}` : 'Enviado'}
+                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-600 cursor-default">
+                            <CheckCheck size={14} />
+                          </div>
+                        ) : (
+                          <a href={`https://wa.me/${c.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensaje.replace('{{nombre}}', c.nombre))}`}
+                            target="_blank" rel="noopener noreferrer"
+                            onClick={() => marcarEnviado(c)}
+                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition">
+                            <MessageCircle size={14} />
+                          </a>
+                        )
                       )}
                     </div>
                   </motion.div>

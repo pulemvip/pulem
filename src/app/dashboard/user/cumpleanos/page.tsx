@@ -142,12 +142,12 @@ export default function CumpleanosPage() {
   }
 
   const cargarMensaje = async (uid: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('user_settings')
       .select('mensaje_cumpleanos')
       .eq('user_id', uid)
-      .single()
-    if (data?.mensaje_cumpleanos) setMensaje(data.mensaje_cumpleanos)
+      .maybeSingle()
+    if (!error && data?.mensaje_cumpleanos) setMensaje(data.mensaje_cumpleanos)
   }
 
   const cargarCumples = async (uid: string, rol: string, todos: boolean) => {

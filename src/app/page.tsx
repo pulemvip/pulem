@@ -79,7 +79,7 @@ export default function Home() {
     const fetchAll = async () => {
       const [{ data: configData }, { data: eventsData, error }] = await Promise.all([
         supabase.from('configuracion').select('mantenimiento_home, mensaje_mantenimiento_home').eq('id', 'global').single(),
-        supabase.from('home_content').select('*').eq('activo', true).order('orden', { ascending: true }),
+        supabase.from('home_content').select('*').order('orden', { ascending: true }),
       ])
       if (configData?.mantenimiento_home) {
         setMantenimientoHome(true)
@@ -137,7 +137,9 @@ export default function Home() {
         <div className={`grid gap-8 sm:gap-16 ${
           loading || events.length === 1
             ? 'grid-cols-1 max-w-xs mx-auto'
-            : 'grid-cols-1 sm:grid-cols-2 sm:gap-40 md:gap-52'
+            : events.length === 2
+            ? 'grid-cols-1 sm:grid-cols-2 sm:gap-40 md:gap-52'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 sm:gap-10'
         }`}>
           {loading ? (
             <>

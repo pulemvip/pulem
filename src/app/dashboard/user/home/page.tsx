@@ -316,14 +316,18 @@ export default function AdminHomePage() {
   }
 
   const crearEvento = async () => {
-    if (homes.length >= 2) { addToast('Máximo 2 eventos permitidos', 'error'); return }
+
     setCreando(true)
     const { data, error } = await supabase.from('home_content').insert({
       titulo: 'Nuevo Evento',
       descripcion: 'Descripción del evento',
       flyer_url: '',
+      video_url: '',
       boton_texto: null,
       boton_link: null,
+      activo: true,
+      orden: homes.length + 1,
+      fecha_evento: null,
     }).select().single()
 
     if (error) addToast('Error al crear evento', 'error')
@@ -360,11 +364,10 @@ export default function AdminHomePage() {
           <div>
             <h1 className="text-xl font-semibold text-white">Home Pública</h1>
             <p className="text-sm text-zinc-500 mt-1">
-              {homes.length === 0 ? 'No hay eventos' : `${homes.length} de 2 eventos`}
+              {homes.length === 0 ? 'No hay eventos' : `${homes.length} evento${homes.length !== 1 ? 's' : ''}`}
             </p>
           </div>
-          {homes.length < 2 && (
-            <button
+          <button
               onClick={crearEvento}
               disabled={creando}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold active:bg-zinc-200 disabled:opacity-40 transition"
@@ -372,7 +375,6 @@ export default function AdminHomePage() {
               {creando ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               {creando ? 'Creando...' : 'Agregar evento'}
             </button>
-          )}
         </div>
 
         {/* Cards */}

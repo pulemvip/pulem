@@ -134,8 +134,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mantenimiento, setMantenimiento] = useState(false)
   const [mensajeMantenimiento, setMensajeMantenimiento] = useState('El sistema está en mantenimiento. Volvé más tarde.')
 
-  // Separamos loading de auth vs loading de datos secundarios
-  // así la navegación no espera a que cargue todo
   const [authReady, setAuthReady] = useState(false)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -145,7 +143,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     crm: true, marketing: true, admin: true,
   })
 
-  // Leer localStorage sin bloquear render
   useEffect(() => {
     const collapsed = localStorage.getItem('sidebarCollapsed')
     const categories = localStorage.getItem('openCategories')
@@ -160,7 +157,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let cancelled = false
 
     const init = async () => {
-      // 1. Auth primero — lo más rápido posible
       const { data: authData } = await supabase.auth.getUser()
       if (cancelled) return
 
@@ -170,10 +166,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       setUserEmail(authData.user.email ?? null)
-      // Mostramos el layout YA — navegación instantánea
       setAuthReady(true)
 
-      // 2. Perfil + config en paralelo — no bloquean la navegación
       const [perfilRes, configRes] = await Promise.all([
         supabase.from('usuarios').select('rol, avatar_url, activo').eq('id', authData.user.id).single(),
         supabase.from('configuracion').select('mantenimiento, mensaje_mantenimiento').eq('id', 'global').single(),
@@ -181,7 +175,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if (cancelled) return
 
-      // Usuario desactivado → cerrar sesión
       if (perfilRes.data?.activo === false) {
         await supabase.auth.signOut()
         router.replace('/login')
@@ -193,7 +186,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (perfilRes.data?.rol) setUserRole(perfilRes.data.rol)
       if (perfilRes.data?.avatar_url) setAvatarUrl(perfilRes.data.avatar_url)
 
-      // Registrar login una sola vez por sesión (solo vendedores)
       if (rol === 'vendedor') {
         const sessionKey = `login_registrado_${authData.user.id}`
         if (!sessionStorage.getItem(sessionKey)) {
@@ -202,14 +194,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
       }
 
-      // Mantenimiento — se aplica después, reemplaza el layout
       if (configRes.data?.mantenimiento && rol !== 'admin') {
         setMantenimiento(true)
         setMensajeMantenimiento(configRes.data.mensaje_mantenimiento)
         return
       }
 
-      // Vendedor solo puede acceder a /clientes y /perfil
       if (rol === 'vendedor') {
         const path = window.location.pathname
         const allowed = ['/dashboard/user/clientes', '/dashboard/user/perfil']
@@ -223,7 +213,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelled = true }
   }, [router])
 
-  // Refrescar avatar + verificar activo al cambiar de página (sin bloquear)
   useEffect(() => {
     let cancelled = false
     const refreshAvatar = async () => {
@@ -255,7 +244,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setOpenCategories(prev => ({ ...prev, [key]: !prev[key] }))
   }, [])
 
-  // Solo spinner si no tenemos auth todavía
   if (!authReady) {
     return (
       <div className="min-h-screen bg-[#0c0c0f] flex items-center justify-center">
@@ -383,15 +371,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </motion.aside>
 
-        <main className="flex-1 p-4 pb-28 md:pb-8 md:p-6 lg:p-8 overflow-y-auto min-w-0">
+        <main className="flex-1 p-4 pb-32 md:pb-8 md:p-6 lg:p-8 overflow-y-auto min-w-0">
           <PushBanner />
           {children}
         </main>
       </div>
 
-      {/* Bottom nav mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0f0f14]/95 backdrop-blur-md border-t border-zinc-800">
-        <div className="flex items-center justify-around px-2 py-2">
+      {/* ── Bottom nav mobile — dock flotante estilo iOS ── */}
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50">
+        <div
+          className="flex items-center justify-around px-2 py-2 rounded-2xl"
+          style={{
+            background: 'rgba(15, 15, 20, 0.65)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            border: '0.5px solid rgba(255,255,255,0.10)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset',
+          }}
+        >
           {mainNavItems.map(item => {
             const active = pathname === item.href
             const Icon = item.icon
